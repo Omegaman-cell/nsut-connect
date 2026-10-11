@@ -1,3 +1,4 @@
+param([switch]$NoBrowser)
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $workFolder = Join-Path $projectRoot 'work'
@@ -44,16 +45,17 @@ if (!(Test-AppService 'http://127.0.0.1:8000/api/health' 'NSUT Connect')) {
     $backendProcess = Start-Process -FilePath $pythonExecutable -ArgumentList '-m uvicorn main:app --host 127.0.0.1 --port 8000' -WorkingDirectory (Join-Path $projectRoot 'backend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $workFolder 'backend.log') -RedirectStandardError (Join-Path $workFolder 'backend-error.log')
     $processIds += @{ id = $backendProcess.Id; start = $backendProcess.StartTime.ToUniversalTime().ToString('o') }
 }
-if (!(Test-AppService 'http://localhost:5173/' 'NSUT Connect')) {
+if (!(Test-AppService 'http://127.0.0.1:5173/' 'NSUT Connect')) {
     $frontendProcess = Start-Process -FilePath $nodeExecutable -ArgumentList 'node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173 --strictPort' -WorkingDirectory (Join-Path $projectRoot 'frontend') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $workFolder 'frontend.log') -RedirectStandardError (Join-Path $workFolder 'frontend-error.log')
     $processIds += @{ id = $frontendProcess.Id; start = $frontendProcess.StartTime.ToUniversalTime().ToString('o') }
 }
 ConvertTo-Json -InputObject @($processIds) | Set-Content -LiteralPath (Join-Path $workFolder 'processes.json')
 $ready = $false
 for ($attempt = 0; $attempt -lt 20; $attempt++) {
-    if ((Test-AppService 'http://localhost:5173/' 'NSUT Connect') -and (Test-AppService 'http://127.0.0.1:8000/api/health' 'NSUT Connect')) { $ready = $true; break }
+    if ((Test-AppService 'http://127.0.0.1:5173/' 'NSUT Connect') -and (Test-AppService 'http://127.0.0.1:8000/api/health' 'NSUT Connect')) { $ready = $true; break }
     Start-Sleep -Milliseconds 500
 }
 if (!$ready) { throw "The app did not start. Read the logs in $workFolder." }
 Write-Host 'NSUT Connect is ready at http://localhost:5173/'
-Start-Process 'http://localhost:5173/'
+if (!$NoBrowser) { Start-Process 'http://localhost:5173/' }
+

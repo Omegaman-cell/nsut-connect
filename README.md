@@ -2,6 +2,8 @@
 
 A complete campus community prototype, built from the React/FastAPI starter in your Scans folder. The interface takes its cues from a campus commons and noticeboard: warm paper, forest green, editorial typography, custom campus line art, and a responsive three-column layout.
 
+![NSUT Connect campus feed](docs/preview.png)
+
 ## Run locally
 
 On this Windows computer, right-click **start.ps1** and choose **Run with PowerShell**, or run:
