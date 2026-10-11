@@ -12,7 +12,6 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>NSUT Connect</title>
     <script>
-      // Apply the theme before React renders, avoiding a light flash in dark mode.
       try {
         const saved = localStorage.getItem('nsut-theme')
         document.documentElement.dataset.theme =
