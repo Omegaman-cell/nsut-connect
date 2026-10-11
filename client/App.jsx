@@ -58,7 +58,7 @@ export default function App() {
     localStorage.setItem('nsut-theme', theme)
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#17191c' : '#f6f7f8')
+      ?.setAttribute('content', theme === 'dark' ? '#171d1a' : '#f4f5f1')
   }, [theme])
   function toggleTheme() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
@@ -327,6 +327,7 @@ export default function App() {
             <button
               key={value}
               className={page === value ? 'nav-item selected' : 'nav-item'}
+              aria-current={page === value ? 'page' : undefined}
               onClick={() => navigate(value)}
             >
               <Icon name={icon} />
@@ -341,6 +342,7 @@ export default function App() {
         <span className="sidebar-section-label">Account</span>
         <button
           className={'nav-item ' + (page === 'profile' ? 'selected' : '')}
+          aria-current={page === 'profile' ? 'page' : undefined}
           onClick={() => navigate('profile')}
         >
           <Icon name="user" />
@@ -401,7 +403,7 @@ export default function App() {
               <input
                 ref={search}
                 aria-label="Search posts and announcements"
-                placeholder="Search your campus"
+                placeholder="Search campus"
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
@@ -412,7 +414,7 @@ export default function App() {
                   }
                 }}
               />
-              <kbd>⌘ K</kbd>
+              <kbd>{navigator.platform.includes('Mac') ? '⌘ K' : 'Ctrl K'}</kbd>
               {query && (
                 <button onClick={() => setQuery('')} aria-label="Clear search">
                   <Icon name="close" size={14} />

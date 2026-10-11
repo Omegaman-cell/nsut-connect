@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import Icon from '../icons'
-import { Avatar } from '../components'
+import { Avatar, CampusDrawing } from '../components'
 
 export default function Profile({ user, tables, posts, onSave, notify }) {
   const [editing, setEditing] = useState(false)
@@ -32,7 +32,7 @@ export default function Profile({ user, tables, posts, onSave, notify }) {
         </div>
       </div>
       <section className="profile-panel">
-        <div className="profile-cover" />
+        <div className="profile-cover"><CampusDrawing /></div>
         <div className="profile-intro">
           <Avatar name={user.name} large />
           <button

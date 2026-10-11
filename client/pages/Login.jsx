@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import ThemeButton from '../ThemeButton'
+import Icon from '../icons'
 import { Brand, CampusDrawing } from '../components'
 import { api } from '../api'
 
@@ -54,16 +55,18 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
         <Brand />
         <div className="login-copy">
           <span className="eyebrow light">NSUT · New Delhi</span>
-          <h1>NSUT Connect</h1>
+          <h1>NSUT<span>Connect.</span></h1>
           <p>
             Ask classmates a question, read campus announcements, or check your
             timetable.
           </p>
-          <CampusDrawing />
         </div>
+        <div className="login-campus"><CampusDrawing /></div>
       </section>
       <section className="login-form">
         <div className="login-welcome">
+          <span className="login-symbol"><Icon name="arrow" size={24} /></span>
+          <span className="eyebrow">Student account</span>
           <h2>Sign in</h2>
           <p>
             Use your @nsut.ac.in Google account.

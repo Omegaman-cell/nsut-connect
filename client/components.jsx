@@ -33,15 +33,22 @@ export function CampusDrawing() {
   return (
     <svg
       className="campus-drawing"
-      viewBox="0 0 440 180"
+      viewBox="0 0 440 220"
       fill="none"
       aria-hidden="true"
     >
-      <g stroke="currentColor" strokeWidth="1.4">
-        <path d="M0 164h440M35 164V92h85v72M41 92l38-23 35 23M65 69V51h27v18M79 51V36M79 36h27l-6 6 6 6H79M120 164V58h152v106M130 58V48h132v10M165 48V25h62v23M177 25V15h38v10M190 15V5h12v10M272 164V93h108v71M279 93l47-24 47 24M314 69V53h25v16M192 164v-30a12 12 0 0 1 24 0v30M184 130h40M25 164v-28m0 0c-28-26-14-46 0-58 14 12 28 32 0 58ZM405 164v-32m0 0c-28-22-12-42 0-55 12 13 28 33 0 55Z" />
-        <path d="M50 110h13v18H50zM89 110h13v18H89zM141 75h17v19h-17zM180 75h17v19h-17zM219 75h17v19h-17zM250 75h10v19h-10zM141 110h17v19h-17zM250 110h10v19h-10zM288 110h16v20h-16zM319 110h16v20h-16zM350 110h16v20h-16zM151 148h18M239 148h17M75 146h13" />
-        <circle cx="201" cy="43" r="7" />
-        <path d="M201 39v5l3 1" />
+      <g stroke="currentColor" strokeWidth="1.1" strokeLinejoin="round">
+        <path d="M16 193h408M34 185h372M66 185V77l90-16v124M66 77l-16-8 90-16 16 8M50 69v110l16 6M156 185V90h151v95M156 90l75-17 76 17M168 96h127M307 185V56l76 14v115M307 56l16-8 76 14-16 8M383 70l16-8v116l-16 7M195 185v-47h73v47M207 138v47M256 138v47M230 139v46M189 185h86v8M185 193v7h94v-7M179 200v7h106v-7" />
+        {[90, 117, 144].map((y) => (
+          <g key={y}>
+            {[78, 104, 130].map((x) => <path key={x} d={`M${x} ${y}v17m9-19v17M${x} ${y + 17}l9-2`} />)}
+            {[320, 344, 368].map((x) => <path key={x} d={`M${x} ${y - 10}v17m9-15v17M${x} ${y + 7}l9 2`} />)}
+          </g>
+        ))}
+        {[179, 207, 235, 263].map((x) => <rect key={x} x={x} y="108" width="17" height="16" />)}
+        <path d="M39 185v-28m0 8c-29-7-27-28-16-38 10-10 11-26 16-30 5 4 6 20 16 30 11 10 13 31-16 38M407 185v-35m0 9c-22-5-22-25-13-33 8-8 10-20 13-23 3 3 5 15 13 23 9 8 9 28-13 33M84 201h57M316 200h50M98 210h25M345 208h36" />
+        <circle cx="251" cy="38" r="18" opacity=".45" />
+        <path d="M18 39h69M44 32h22M345 22h58" opacity=".3" />
       </g>
     </svg>
   )
@@ -203,7 +210,6 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
             Pin this update to the top
           </label>
         )}
-        <div className="form-note">Do not share private contact details.</div>
         {error && (
           <p className="form-error" role="alert">
             {error}
