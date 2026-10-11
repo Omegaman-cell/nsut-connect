@@ -1,152 +1,1143 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, session, storeSession, isHostedDemo } from './api'
 import Icon from './icons'
+import { selectedSection } from './timetable'
+import {
+  categories,
+  navigation,
+  todayName,
+  initialDay,
+  date,
+  categoryClass,
+} from './helpers'
+import {
+  Avatar,
+  Brand,
+  CampusDrawing,
+  Modal,
+  Compose,
+  PostCard,
+  Thread,
+  Empty,
+} from './components'
+import Login from './pages/Login'
+import Timetable from './pages/Timetable'
+import Profile from './pages/Profile'
 
-const categories = ['Academics', 'Events', 'Hackathons', 'Campus', 'Opportunities']
-const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
-const navigation = [['feed','home','Campus feed'],['discussions','chat','Discussions'],['announcements','bell','Announcements'],['timetable','calendar','My timetable'],['saved','bookmark','Saved posts']]
-const todayName = () => new Intl.DateTimeFormat('en-US',{weekday:'long',timeZone:'Asia/Kolkata'}).format(new Date())
-const initialDay = () => days.includes(todayName()) ? todayName() : 'Monday'
-const initials = name => name?.trim().split(/\s+/).slice(0,2).map(s=>s[0]).join('').toUpperCase() || 'NC'
-const date = value => { const d=new Date(value.includes('T')?value:value.replace(' ','T')+'+05:30');return Number.isNaN(d.getTime())?'Recently':d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}) }
-const categoryClass = value => value.toLowerCase()
-function Avatar({name,large=false}) { return <span className={'avatar '+(large?'large ':'')+(['A','Y','P'].includes(name?.[0])?'sage':'sand')}>{initials(name)}</span> }
-function Brand() { return <div className="brand"><span className="brand-mark">n<span>•</span></span><div>NSUT<span>connect</span></div></div> }
-function CampusDrawing() { return <svg className="campus-drawing" viewBox="0 0 440 180" fill="none" aria-hidden="true"><g stroke="currentColor" strokeWidth="1.4"><path d="M0 164h440M35 164V92h85v72M41 92l38-23 35 23M65 69V51h27v18M79 51V36M79 36h27l-6 6 6 6H79M120 164V58h152v106M130 58V48h132v10M165 48V25h62v23M177 25V15h38v10M190 15V5h12v10M272 164V93h108v71M279 93l47-24 47 24M314 69V53h25v16M192 164v-30a12 12 0 0 1 24 0v30M184 130h40M25 164v-28m0 0c-28-26-14-46 0-58 14 12 28 32 0 58ZM405 164v-32m0 0c-28-22-12-42 0-55 12 13 28 33 0 55Z"/><path d="M50 110h13v18H50zM89 110h13v18H89zM141 75h17v19h-17zM180 75h17v19h-17zM219 75h17v19h-17zM250 75h10v19h-10zM141 110h17v19h-17zM250 110h10v19h-10zM288 110h16v20h-16zM319 110h16v20h-16zM350 110h16v20h-16zM151 148h18M239 148h17M75 146h13"/><circle cx="201" cy="43" r="7"/><path d="M201 39v5l3 1M12 43h24m-12-12v24M375 30h12m-6-6v12"/></g></svg> }
-
-function Modal({title,onClose,children,wide=false}) {
-  const box=useRef(null)
-  const closing=useRef(onClose)
-  closing.current=onClose
-  useEffect(()=>{
-    const prior=document.activeElement
-    const overflow=document.body.style.overflow
-    document.body.style.overflow='hidden'
-    box.current?.querySelector('input,textarea,select,button')?.focus()
-    const key=e=>{
-      if(e.key==='Escape') closing.current()
-      if(e.key==='Tab') {
-        const elements=[...box.current.querySelectorAll('button,input,select,textarea,a[href]')].filter(el=>!el.disabled)
-        const first=elements[0],last=elements.at(-1)
-        if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}
-        else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}
+// App owns the shared data and passes it to the screens through props.
+export default function App() {
+  const [auth, setAuth] = useState(session)
+  const [config, setConfig] = useState({ google_client_id: '', demo: true })
+  const [page, setPage] = useState(location.hash.slice(1) || 'feed')
+  const [posts, setPosts] = useState([])
+  const [announcements, setAnnouncements] = useState([])
+  const [tables, setTables] = useState({})
+  const [loading, setLoading] = useState(!!session())
+  const [error, setError] = useState('')
+  const [category, setCategory] = useState('All')
+  const [sort, setSort] = useState('latest')
+  const [query, setQuery] = useState('')
+  const [modal, setModal] = useState(null)
+  const [toast, setToast] = useState('')
+  const [mobile, setMobile] = useState(false)
+  const [online, setOnline] = useState(navigator.onLine)
+  const [read, setRead] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('nsut-read') || '[]')
+    } catch {
+      return []
+    }
+  })
+  const search = useRef(null)
+  const toastTimer = useRef(null)
+  const user = auth?.user
+  function notify(message) {
+    setToast(message)
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 4000)
+  }
+  function navigate(value) {
+    location.hash = value
+    setPage(value)
+    setMobile(false)
+    setQuery('')
+    setCategory('All')
+    window.scrollTo({ top: 0 })
+  }
+  function login(value) {
+    storeSession(value)
+    setAuth(value)
+    setError('')
+    navigate('feed')
+  }
+  function updateUser(value) {
+    const next = { ...session(), user: value }
+    storeSession(next)
+    setAuth(next)
+  }
+  async function load() {
+    setLoading(true)
+    setError('')
+    try {
+      const [me, p, a, t] = await Promise.all([
+        api('/me'),
+        api('/posts'),
+        api('/announcements'),
+        api('/timetable'),
+      ])
+      updateUser(me)
+      setPosts(p)
+      setAnnouncements(a)
+      setTables(t)
+      localStorage.setItem('nsut-offline-timetable', JSON.stringify(t))
+      localStorage.setItem('nsut-offline-data', JSON.stringify({ p, a }))
+    } catch (err) {
+      setError(err.message)
+      if (!navigator.onLine) {
+        try {
+          setTables(
+            JSON.parse(localStorage.getItem('nsut-offline-timetable') || '{}'),
+          )
+          const cache = JSON.parse(
+            localStorage.getItem('nsut-offline-data') || '{}',
+          )
+          setPosts(cache.p || [])
+          setAnnouncements(cache.a || [])
+        } catch {
+          /* no cache */
+        }
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+  useEffect(() => {
+    api('/config')
+      .then(setConfig)
+      .catch(() => {})
+    const expired = () => {
+      setAuth(null)
+      setModal(null)
+    }
+    const hash = () => setPage(location.hash.slice(1) || 'feed')
+    const connection = () => setOnline(navigator.onLine)
+    const shortcut = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        search.current?.focus()
       }
     }
-    document.addEventListener('keydown',key)
-    return ()=>{document.body.style.overflow=overflow;document.removeEventListener('keydown',key);prior?.focus()}
-  },[])
-  return <div className="modal-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><section className={'modal '+(wide?'wide':'')} ref={box} role="dialog" aria-modal="true" aria-label={title}><div className="modal-heading"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Close dialog"><Icon name="close"/></button></div>{children}</section></div>
-}
-
-function Login({onLogin,config}) {
-  const [busy,setBusy]=useState(''),[error,setError]=useState('')
-  const google=useRef(null)
-  async function enter(email) {
-    setBusy(email);setError('')
-    try { onLogin(await api('/auth/demo','POST',{email})) } catch(e){setError(e.message)} finally{setBusy('')}
+    window.addEventListener('session-expired', expired)
+    window.addEventListener('hashchange', hash)
+    window.addEventListener('online', connection)
+    window.addEventListener('offline', connection)
+    window.addEventListener('keydown', shortcut)
+    return () => {
+      clearTimeout(toastTimer.current)
+      window.removeEventListener('session-expired', expired)
+      window.removeEventListener('hashchange', hash)
+      window.removeEventListener('online', connection)
+      window.removeEventListener('offline', connection)
+      window.removeEventListener('keydown', shortcut)
+    }
+  }, [])
+  useEffect(() => {
+    if (auth) load()
+  }, [auth?.token])
+  useEffect(() => {
+    const valid = [
+      'feed',
+      'discussions',
+      'announcements',
+      'timetable',
+      'saved',
+      'profile',
+      'admin',
+    ]
+    if (!valid.includes(page) || (page === 'admin' && user?.role !== 'admin')) {
+      setPage('feed')
+      location.hash = 'feed'
+    }
+  }, [page, user?.role])
+  async function logout() {
+    try {
+      await api('/auth/logout', 'POST')
+    } catch {}
+    storeSession(null)
+    setAuth(null)
+    setModal(null)
+    setPosts([])
+    setAnnouncements([])
+    setRead([])
+    localStorage.removeItem('nsut-read')
   }
-  useEffect(()=>{
-    if(!config.google_client_id) return
-    let active=true
-    const script=document.createElement('script');script.src='https://accounts.google.com/gsi/client';script.async=true
-    script.onload=()=>{if(!active||!window.google)return;window.google.accounts.id.initialize({client_id:config.google_client_id,hd:'nsut.ac.in',callback:async({credential})=>{try{onLogin(await api('/auth/google','POST',{credential}))}catch(e){setError(e.message)}}});window.google.accounts.id.renderButton(google.current,{theme:'outline',size:'large',width:320})}
-    document.head.appendChild(script)
-    return ()=>{active=false;script.remove()}
-  },[config.google_client_id,onLogin])
-  return <div className="login"><section className="login-story"><Brand/><div className="login-copy"><span className="eyebrow light">THE NSUT STUDENT COMMONS</span><h1>Your campus.<br/>In good <em>company.</em></h1><p>From the next lecture to your next big idea.<br/>A little less noise. A lot more connection.</p><CampusDrawing/><div className="login-bottom"><span>DISCUSS. DISCOVER. BELONG.</span><span>NEW DELHI ↗</span></div></div></section><section className="login-form"><div className="login-welcome"><span className="mini-symbol"><Icon name="sun" size={28}/></span><span className="eyebrow">MAKE YOURSELF AT HOME</span><h2>Welcome to the commons.</h2><p>Your conversations, campus updates, and week ahead, all in one place.</p>{config.google_client_id?<div ref={google} className="google-signin"/>:<div className="google-note"><Icon name="shield"/><span>Campus accounts use <strong>@nsut.ac.in</strong>.<br/><small>Google sign-in can be enabled by the app administrator.</small></span></div>}{config.demo&&<><div className="divider"><span>EXPLORE THE DEMO</span></div><button className="button primary full" disabled={!!busy} onClick={()=>enter('student@nsut.ac.in')}>{busy==='student@nsut.ac.in'?'Opening campus…':'Enter as a student'}<Icon name="arrow"/></button><button className="button outline full" disabled={!!busy} onClick={()=>enter('admin@nsut.ac.in')}>{busy==='admin@nsut.ac.in'?'Opening admin…':'Explore as an admin'}<Icon name="shield"/></button></>}{error&&<p className="form-error" role="alert">{error}</p>}{config.demo&&<p className="demo-note">A working prototype with sample campus data.<br/>{isHostedDemo?'Your demo changes are saved in this browser.':'Your demo changes are saved on the local server.'}</p>}<div className="login-foot"><span>BUILT FOR THE NSUT COMMUNITY</span><span>01 / CONNECT</span></div></div></section></div>
-}
-
-function Compose({user,announcement,initial,onSubmit,onClose}) {
-  const [title,setTitle]=useState(initial?.title||''),[content,setContent]=useState(initial?.content||''),[category,setCategory]=useState(initial?.category||'Campus'),[pinned,setPinned]=useState(initial?.is_pinned||false),[busy,setBusy]=useState(false),[error,setError]=useState('')
-  async function submit(e){e.preventDefault();setBusy(true);setError('');try{await onSubmit({title:title.trim(),content:content.trim(),category,...(announcement?{is_pinned:pinned}:{})})}catch(err){setError(err.message)}finally{setBusy(false)}}
-  return <Modal title={announcement?(initial?'Edit announcement':'Post an announcement'):'Start a conversation'} onClose={onClose}><form onSubmit={submit}><div className="compose-user"><Avatar name={user.name}/><div><strong>{user.name}</strong><small>{announcement?'Posting to the campus noticeboard':'Sharing with the NSUT community'}</small></div></div><label>Topic<select value={category} onChange={e=>setCategory(e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Title<input required minLength={3} maxLength={140} value={title} onChange={e=>setTitle(e.target.value)} placeholder={announcement?'Give your update a clear title':'What’s on your mind?'} /></label><label>Message<textarea required minLength={3} maxLength={4000} rows={6} value={content} onChange={e=>setContent(e.target.value)} placeholder="Share the details. A question, an idea, an invitation…"/></label>{announcement&&<label className="checkbox"><input type="checkbox" checked={pinned} onChange={e=>setPinned(e.target.checked)}/>Pin this update to the top</label>}<div className="form-note">Keep it kind. Keep it useful. You’re among peers.</div>{error&&<p className="form-error" role="alert">{error}</p>}<div className="modal-footer"><button className="button text" type="button" onClick={onClose}>Cancel</button><button className="button primary" disabled={busy}>{busy?'Publishing…':initial?'Save changes':announcement?'Publish update':'Post conversation'}<Icon name="arrow" size={17}/></button></div></form></Modal>
-}
-
-function PostCard({post,user,onLike,onSave,onOpen,onDelete,compact=false}) {
-  const liked=post.liked_by?.includes(user.id),saved=user.saved?.includes(post.id)
-  const [busy,setBusy]=useState(false)
-  async function action(fn){if(busy)return;setBusy(true);try{await fn()}finally{setBusy(false)}}
-  return <article className={'post-card '+(compact?'compact':'')}><div className="post-top"><Avatar name={post.author}/><div className="post-author"><strong>{post.author}</strong><small>NSUT student <span>·</span> {date(post.created_at)}</small></div><span className={'tag '+categoryClass(post.category)}>{post.category}</span></div><button className="post-title" onClick={()=>onOpen(post.id)}><h3>{post.title}</h3></button><p className="post-content">{post.content}</p><div className="post-actions"><button className={liked?'active-action':''} disabled={busy} onClick={()=>action(()=>onLike(post.id))} aria-label={(liked?'Unlike':'Like')+' '+post.title} aria-pressed={!!liked}><Icon name="heart" size={18} fill={liked?'currentColor':'none'}/><span>{post.likes}</span></button><button onClick={()=>onOpen(post.id)}><Icon name="chat" size={18}/><span>{post.comments?.length || 0} <span className="reply-label">replies</span></span></button><div className="post-actions-spacer"/>{(post.author_email===user.email||user.role==='admin')&&<button className="delete-action" onClick={()=>onDelete(post)} aria-label={'Delete '+post.title}><Icon name="trash" size={17}/></button>}<button className={saved?'active-action':''} disabled={busy} onClick={()=>action(()=>onSave(post.id))} aria-label={(saved?'Unsave':'Save')+' '+post.title} aria-pressed={!!saved}><Icon name="bookmark" size={18} fill={saved?'currentColor':'none'}/></button></div></article>
-}
-
-function Thread({post,user,onClose,onReply}) {
-  const [reply,setReply]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('')
-  async function submit(e){e.preventDefault();setBusy(true);try{await onReply(post.id,reply);setReply('');setError('')}catch(err){setError(err.message)}finally{setBusy(false)}}
-  return <Modal title="The conversation" wide onClose={onClose}><div className="thread"><span className={'tag '+categoryClass(post.category)}>{post.category}</span><h2>{post.title}</h2><div className="compose-user"><Avatar name={post.author}/><div><strong>{post.author}</strong><small>{date(post.created_at)} · NSUT community</small></div></div><p className="thread-content">{post.content}</p><div className="thread-replies"><h3>{post.comments?.length||0} replies</h3>{!post.comments?.length&&<p className="muted">A good conversation starts with one reply. Add yours.</p>}{post.comments?.map(c=><div className="comment" key={c.id}><Avatar name={c.author}/><div><strong>{c.author}</strong><small>{date(c.created_at)}</small><p>{c.content}</p></div></div>)}</div><form onSubmit={submit}><label>Your reply<textarea autoFocus rows={3} required maxLength={2000} value={reply} onChange={e=>setReply(e.target.value)} placeholder="Add something to the conversation…"/></label>{error&&<p className="form-error" role="alert">{error}</p>}<div className="modal-footer"><button className="button primary" disabled={busy||!reply.trim()}>{busy?'Posting…':'Post reply'}<Icon name="arrow" size={17}/></button></div></form></div></Modal>
-}
-
-function Empty({icon='chat',title,description,action}) { return <div className="empty-state"><span><Icon name={icon} size={29}/></span><h3>{title}</h3><p>{description}</p>{action}</div> }
-
-function Timetable({tables,user,notify}) {
-  const [branch,setBranch]=useState(user.branch||'CSE'),[semester,setSemester]=useState(user.semester||'1'),[day,setDay]=useState(initialDay),[view,setView]=useState('day')
-  const semesters=Object.keys(tables[branch]||{})
-  const schedule=tables[branch]?.[semester]||[]
-  function changeBranch(value){setBranch(value);setSemester(Object.keys(tables[value]||{})[0]||'1')}
-  function download() {
-    const csv=['Day,Time,Subject,Room,Faculty',...schedule.map(c=>[c.day,c.time,c.subject,c.room,c.faculty].map(v=>'"'+v.replaceAll('"','""')+'"').join(','))].join('\r\n')
-    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));const a=document.createElement('a');a.href=url;a.download=`NSUT-${branch}-semester-${semester}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);notify('Timetable downloaded.')
+  async function like(postId) {
+    try {
+      const p = await api(`/posts/${postId}/like`, 'POST')
+      setPosts((items) => items.map((i) => (i.id === p.id ? p : i)))
+    } catch (err) {
+      notify(err.message)
+    }
   }
-  return <><div className="page-heading"><div><span className="eyebrow">A LITTLE STRUCTURE GOES A LONG WAY</span><h1>Your week, at a glance.</h1><p>Make room for the things between classes.</p></div><button className="button outline" onClick={download} disabled={!schedule.length}><Icon name="download" size={17}/>Download</button></div><section className="schedule-panel"><div className="schedule-toolbar"><div className="schedule-selects"><label>Branch<select value={branch} onChange={e=>changeBranch(e.target.value)}>{Object.keys(tables).map(b=><option key={b}>{b}</option>)}</select></label><label>Semester<select value={semester} onChange={e=>setSemester(e.target.value)}>{semesters.map(s=><option key={s} value={s}>Semester {s}</option>)}</select></label></div><div className="segmented"><button className={view==='day'?'selected':''} onClick={()=>setView('day')}>Day</button><button className={view==='week'?'selected':''} onClick={()=>setView('week')}>Week</button></div></div>{view==='day'?<><div className="day-tabs">{days.map(d=><button key={d} className={d===day?'selected':''} onClick={()=>setDay(d)}>{d.slice(0,3)}<span>{schedule.filter(c=>c.day===d).length} classes</span></button>)}</div><div className="schedule-day-heading"><h2>{day}</h2><span>{schedule.filter(c=>c.day===day).length} on your schedule</span></div><div className="class-list">{schedule.filter(c=>c.day===day).map((c,i)=><div className="class-row" key={i}><div className="class-time"><Icon name="clock" size={17}/>{c.time}</div><div className={'class-content '+(c.subject.includes('Lab')?'lab':'')}><span className="eyebrow">{c.subject.includes('Lab')?'PRACTICAL':'LECTURE'}</span><h3>{c.subject}</h3><div><span><Icon name="location" size={14}/>{c.room}</span><span><Icon name="user" size={14}/>{c.faculty}</span></div></div></div>)}{!schedule.some(c=>c.day===day)&&<Empty icon="sun" title="A little breathing room." description="No classes scheduled for this day. Use it well."/>}</div></>:<div className="week-grid">{days.map(d=><div className="week-column" key={d}><h3>{d}</h3>{schedule.filter(c=>c.day===d).map((c,i)=><div className={'week-class '+(c.subject.includes('Lab')?'lab':'')} key={i}><small>{c.time}</small><strong>{c.subject}</strong><span>{c.room} · {c.faculty}</span></div>)}{!schedule.some(c=>c.day===d)&&<p className="muted">No classes</p>}</div>)}</div>}<div className="schedule-footer"><Icon name="check" size={16}/><span>Sample timetable from your starter · Cached on this device for offline access</span></div></section><div className="quiet-note"><Icon name="book"/><p>Planning ahead? Pick a different branch or semester to explore the available schedules.</p></div></>
+  async function savePost(postId) {
+    try {
+      const u = await api(`/posts/${postId}/save`, 'POST')
+      updateUser(u)
+      notify(
+        u.saved.includes(postId)
+          ? 'Saved to your collection.'
+          : 'Removed from saved posts.',
+      )
+    } catch (err) {
+      notify(err.message)
+    }
+  }
+  async function publish(body) {
+    if (modal.type === 'announcement') {
+      const item = await api(
+        modal.item ? `/announcements/${modal.item.id}` : '/announcements',
+        modal.item ? 'PATCH' : 'POST',
+        body,
+      )
+      setAnnouncements((items) =>
+        [item, ...items.filter((i) => i.id !== item.id)].sort(
+          (a, b) => Number(b.is_pinned) - Number(a.is_pinned) || b.id - a.id,
+        ),
+      )
+      notify(modal.item ? 'Announcement updated.' : 'Announcement published.')
+    } else {
+      const p = await api('/posts', 'POST', body)
+      setPosts((items) => [p, ...items])
+      setCategory('All')
+      notify('Your conversation is live.')
+    }
+    setModal(null)
+  }
+  async function reply(postId, content) {
+    const p = await api(`/posts/${postId}/comments`, 'POST', { content })
+    setPosts((items) => items.map((i) => (i.id === p.id ? p : i)))
+    notify('Reply posted.')
+  }
+  async function remove() {
+    try {
+      await api(
+        modal.kind === 'announcement'
+          ? `/announcements/${modal.item.id}`
+          : `/posts/${modal.item.id}`,
+        'DELETE',
+      )
+      if (modal.kind === 'announcement')
+        setAnnouncements((items) => items.filter((i) => i.id !== modal.item.id))
+      else {
+        setPosts((items) => items.filter((i) => i.id !== modal.item.id))
+        updateUser({
+          ...user,
+          saved: (user.saved || []).filter((id) => id !== modal.item.id),
+        })
+      }
+      setModal(null)
+      notify('Removed successfully.')
+    } catch (err) {
+      notify(err.message)
+    }
+  }
+  function markRead() {
+    const ids = announcements.map((a) => a.id)
+    setRead(ids)
+    localStorage.setItem('nsut-read', JSON.stringify(ids))
+    notify('You’re all caught up.')
+  }
+  const filtered = posts
+    .filter(
+      (p) =>
+        (category === 'All' || p.category === category) &&
+        `${p.title} ${p.content} ${p.author}`
+          .toLowerCase()
+          .includes(query.toLowerCase()) &&
+        (page !== 'saved' || user?.saved?.includes(p.id)),
+    )
+    .sort((a, b) => (sort === 'popular' ? b.likes - a.likes : b.id - a.id))
+  const visibleAnnouncements = announcements.filter(
+    (a) =>
+      (category === 'All' || a.category === category) &&
+      `${a.title} ${a.content} ${a.posted_by}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  )
+  const thread =
+    modal?.type === 'thread' ? posts.find((p) => p.id === modal.id) : null
+  const unread = announcements.filter((a) => !read.includes(a.id)).length
+  const userClasses = tables[user?.branch]?.[user?.semester] || []
+  const userSection = selectedSection(
+    user?.id,
+    user?.branch,
+    user?.semester,
+    userClasses,
+  )
+  const upcoming = userClasses.filter(
+    (item) => item.day === initialDay() && item.section === userSection,
+  )
+  const close = () => setModal(null)
+  if (!auth) return <Login onLogin={login} config={config} />
+  return (
+    <div className="app-shell">
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault()
+          document.getElementById('main')?.focus()
+        }}
+      >
+        Skip to content
+      </a>
+      {mobile && (
+        <button
+          className="sidebar-scrim"
+          aria-label="Close menu"
+          onClick={() => setMobile(false)}
+        />
+      )}
+      <aside className={'sidebar ' + (mobile ? 'open' : '')}>
+        <Brand />
+        <div className="campus-label">
+          <span className="live-dot" />
+          THE STUDENT COMMONS
+        </div>
+        <nav aria-label="Main navigation">
+          {navigation.map(([value, icon, label]) => (
+            <button
+              key={value}
+              className={page === value ? 'nav-item selected' : 'nav-item'}
+              onClick={() => navigate(value)}
+            >
+              <Icon name={icon} />
+              {label}
+              {value === 'announcements' && unread > 0 && (
+                <span className="nav-count">{unread}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="nav-separator" />
+        <span className="sidebar-section-label">YOUR SPACE</span>
+        <button
+          className={'nav-item ' + (page === 'profile' ? 'selected' : '')}
+          onClick={() => navigate('profile')}
+        >
+          <Icon name="user" />
+          My profile
+        </button>
+        {user.role === 'admin' && (
+          <button
+            className={'nav-item ' + (page === 'admin' ? 'selected' : '')}
+            onClick={() => navigate('admin')}
+          >
+            <Icon name="shield" />
+            Admin studio
+          </button>
+        )}
+        <div className="sidebar-bottom">
+          <div className="commons-note">
+            <Icon name="book" size={25} />
+            <strong>Better, together.</strong>
+            <p>
+              A place for your people,
+              <br />
+              your questions, your ideas.
+            </p>
+            <button onClick={() => setModal({ type: 'about' })}>
+              About the commons <Icon name="arrow" size={16} />
+            </button>
+          </div>
+          <button className="sidebar-user" onClick={() => navigate('profile')}>
+            <Avatar name={user.name} />
+            <span>
+              <strong>{user.name}</strong>
+              <small>
+                {user.branch} · Semester {user.semester}
+              </small>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+          <button className="signout" onClick={logout}>
+            <Icon name="logout" size={15} />
+            Sign out<span>{isHostedDemo ? 'BROWSER DEMO' : 'LOCAL API'}</span>
+          </button>
+        </div>
+      </aside>
+      <div className="workspace">
+        <header className="topbar">
+          <div className="breadcrumb">
+            <button
+              className="icon-button mobile-menu"
+              onClick={() => setMobile(!mobile)}
+              aria-label="Open menu"
+            >
+              <Icon name="menu" />
+            </button>
+            <span>Campus</span>
+            <Icon name="chevron" size={13} />
+            <strong>
+              {
+                [
+                  ...navigation,
+                  ['profile', '', 'My profile'],
+                  ['admin', '', 'Admin studio'],
+                ].find((n) => n[0] === page)?.[2]
+              }
+            </strong>
+          </div>
+          <div className="topbar-actions">
+            <div className="search-box">
+              <Icon name="search" size={17} />
+              <input
+                ref={search}
+                aria-label="Search posts and announcements"
+                placeholder="Search your campus"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value)
+                  if (['profile', 'admin', 'timetable'].includes(page)) {
+                    location.hash = 'feed'
+                    setPage('feed')
+                    setCategory('All')
+                  }
+                }}
+              />
+              <kbd>⌘ K</kbd>
+              {query && (
+                <button onClick={() => setQuery('')} aria-label="Clear search">
+                  <Icon name="close" size={14} />
+                </button>
+              )}
+            </div>
+            <button
+              className="notification-button icon-button"
+              onClick={() => setModal({ type: 'notifications' })}
+              aria-label={`Notifications, ${unread} unread`}
+            >
+              <Icon name="bell" />
+              {unread > 0 && <i />}
+            </button>
+            <button
+              className="top-avatar"
+              aria-label="Open your profile"
+              onClick={() => navigate('profile')}
+            >
+              <Avatar name={user.name} />
+            </button>
+          </div>
+        </header>
+        <main
+          id="main"
+          tabIndex={-1}
+          className={
+            'main ' +
+            (['timetable', 'profile', 'admin'].includes(page)
+              ? 'full-page'
+              : '')
+          }
+        >
+          {!online && (
+            <div className="status-banner">
+              <Icon name="calendar" size={18} />
+              You’re offline. Your cached timetable is still here.
+            </div>
+          )}
+          {error && (
+            <div className="error-banner" role="alert">
+              <span>{error}</span>
+              <button onClick={load}>
+                Try again <Icon name="arrow" size={15} />
+              </button>
+            </div>
+          )}
+          {loading ? (
+            <div className="loading-state">
+              <span className="loading-spinner" />
+              <h2>Gathering your campus…</h2>
+            </div>
+          ) : (
+            <>
+              {['feed', 'discussions', 'saved', 'announcements'].includes(
+                page,
+              ) && (
+                <div className="content-grid">
+                  <section className="primary-content">
+                    {page === 'feed' && (
+                      <>
+                        <div className="welcome-heading">
+                          <span className="eyebrow">
+                            {new Date()
+                              .toLocaleDateString('en-IN', {
+                                weekday: 'long',
+                                day: 'numeric',
+                                month: 'long',
+                                timeZone: 'Asia/Kolkata',
+                              })
+                              .toUpperCase()}
+                          </span>
+                          <h1>Hey {user.name.split(' ')[0]}, you’re home.</h1>
+                          <p>
+                            Here’s what’s happening in your corner of campus.
+                          </p>
+                        </div>
+                        <div className="welcome-banner">
+                          <div>
+                            <span className="eyebrow">
+                              YOUR CAMPUS. YOUR PEOPLE.
+                            </span>
+                            <h2>
+                              Good things start
+                              <br />
+                              with a conversation.
+                            </h2>
+                            <button
+                              onClick={() => {
+                                navigate('discussions')
+                              }}
+                            >
+                              Find your next one <Icon name="arrow" size={17} />
+                            </button>
+                          </div>
+                          <CampusDrawing />
+                          <span className="banner-edition">
+                            THE COMMONS / VOL. 01
+                          </span>
+                        </div>
+                        <button
+                          className="composer"
+                          onClick={() => setModal({ type: 'post' })}
+                        >
+                          <Avatar name={user.name} />
+                          <span>
+                            Got a question, an idea, or a little campus news?
+                          </span>
+                          <span className="composer-plus">
+                            <Icon name="plus" />
+                          </span>
+                        </button>
+                      </>
+                    )}
+                    {page === 'discussions' && (
+                      <>
+                        <div className="page-heading">
+                          <div>
+                            <span className="eyebrow">
+                              ASK. SHARE. FIGURE IT OUT TOGETHER.
+                            </span>
+                            <h1>Let’s talk campus.</h1>
+                            <p>A good question can take you somewhere new.</p>
+                          </div>
+                          <button
+                            className="button primary"
+                            onClick={() => setModal({ type: 'post' })}
+                          >
+                            <Icon name="plus" size={17} />
+                            New conversation
+                          </button>
+                        </div>
+                        <div className="topic-grid">
+                          {categories.slice(0, 4).map((c, i) => (
+                            <button
+                              key={c}
+                              className={
+                                'topic ' +
+                                categoryClass(c) +
+                                (category === c ? ' chosen' : '')
+                              }
+                              onClick={() =>
+                                setCategory(category === c ? 'All' : c)
+                              }
+                            >
+                              <Icon
+                                name={['book', 'calendar', 'code', 'home'][i]}
+                                size={24}
+                              />
+                              <strong>{c}</strong>
+                              <span>
+                                {posts.filter((p) => p.category === c).length}{' '}
+                                conversations
+                              </span>
+                              <Icon name="arrow" size={17} />
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                    {page === 'saved' && (
+                      <div className="page-heading">
+                        <div>
+                          <span className="eyebrow">
+                            KEEP THE GOOD STUFF CLOSE
+                          </span>
+                          <h1>Worth coming back to.</h1>
+                          <p>
+                            Your bookmarked conversations, all in one place.
+                          </p>
+                        </div>
+                        <span className="count-pill">
+                          {
+                            posts.filter((p) => user.saved?.includes(p.id))
+                              .length
+                          }{' '}
+                          saved
+                        </span>
+                      </div>
+                    )}
+                    {page === 'announcements' && (
+                      <div className="page-heading">
+                        <div>
+                          <span className="eyebrow">
+                            THE CAMPUS NOTICEBOARD
+                          </span>
+                          <h1>Stay in the loop.</h1>
+                          <p>Updates that deserve a place on your radar.</p>
+                        </div>
+                        {user.role === 'admin' && (
+                          <button
+                            className="button primary"
+                            onClick={() => setModal({ type: 'announcement' })}
+                          >
+                            <Icon name="plus" size={17} />
+                            New update
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div className="feed-title-row">
+                      <h2>
+                        {query
+                          ? 'Search results'
+                          : page === 'announcements'
+                            ? 'Campus updates'
+                            : page === 'saved'
+                              ? 'Your collection'
+                              : 'The conversation'}
+                      </h2>
+                      {page !== 'announcements' && (
+                        <label className="sort-control">
+                          <span className="sr-only">Sort conversations</span>
+                          <select
+                            value={sort}
+                            onChange={(e) => setSort(e.target.value)}
+                          >
+                            <option value="latest">Latest first</option>
+                            <option value="popular">Most liked</option>
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                    <div className="filter-tabs" aria-label="Filter by topic">
+                      {['All', ...categories].map((c) => (
+                        <button
+                          key={c}
+                          className={category === c ? 'selected' : ''}
+                          onClick={() => setCategory(c)}
+                          aria-pressed={category === c}
+                        >
+                          {c === 'All' ? 'For you' : c}
+                        </button>
+                      ))}
+                    </div>
+                    {page === 'announcements' ? (
+                      <div className="announcement-list">
+                        {visibleAnnouncements.map((a) => (
+                          <article
+                            className={
+                              'announcement-card ' +
+                              (a.is_pinned ? 'pinned' : '')
+                            }
+                            key={a.id}
+                          >
+                            <div className="announcement-meta">
+                              <span
+                                className={'tag ' + categoryClass(a.category)}
+                              >
+                                {a.category}
+                              </span>
+                              {a.is_pinned && (
+                                <span className="pinned-label">
+                                  <Icon name="pin" size={14} />
+                                  PINNED UPDATE
+                                </span>
+                              )}
+                              <small>{date(a.created_at)}</small>
+                            </div>
+                            <h2>{a.title}</h2>
+                            <p>{a.content}</p>
+                            <div className="announcement-footer">
+                              <span>
+                                <Icon name="shield" size={16} />
+                                {a.posted_by}
+                              </span>
+                              {user.role === 'admin' && (
+                                <div>
+                                  <button
+                                    className="icon-button"
+                                    aria-label={'Edit ' + a.title}
+                                    onClick={() =>
+                                      setModal({
+                                        type: 'announcement',
+                                        item: a,
+                                      })
+                                    }
+                                  >
+                                    <Icon name="edit" size={17} />
+                                  </button>
+                                  <button
+                                    className="icon-button"
+                                    aria-label={'Delete ' + a.title}
+                                    onClick={() =>
+                                      setModal({
+                                        type: 'delete',
+                                        item: a,
+                                        kind: 'announcement',
+                                      })
+                                    }
+                                  >
+                                    <Icon name="trash" size={17} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </article>
+                        ))}
+                        {!visibleAnnouncements.length && (
+                          <Empty
+                            icon="bell"
+                            title="Nothing on this board yet."
+                            description="Try a different topic or search."
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div className="post-list">
+                        {filtered.map((p) => (
+                          <PostCard
+                            key={p.id}
+                            post={p}
+                            user={user}
+                            onLike={like}
+                            onSave={savePost}
+                            onOpen={(id) => setModal({ type: 'thread', id })}
+                            onDelete={(item) =>
+                              setModal({ type: 'delete', item })
+                            }
+                          />
+                        ))}
+                        {!filtered.length && (
+                          <Empty
+                            icon={page === 'saved' ? 'bookmark' : 'search'}
+                            title={
+                              page === 'saved'
+                                ? 'A place for your favourites.'
+                                : 'No conversations found.'
+                            }
+                            description={
+                              page === 'saved'
+                                ? 'Tap the bookmark on any post to keep it here.'
+                                : 'Try another topic or start something new.'
+                            }
+                            action={
+                              <button
+                                className="button outline"
+                                onClick={() =>
+                                  page === 'saved'
+                                    ? navigate('feed')
+                                    : setModal({ type: 'post' })
+                                }
+                              >
+                                {page === 'saved'
+                                  ? 'Explore the feed'
+                                  : 'Start a conversation'}
+                                <Icon name="arrow" size={16} />
+                              </button>
+                            }
+                          />
+                        )}
+                      </div>
+                    )}
+                    <div className="feed-end">
+                      <span />
+                      YOU’RE IN GOOD COMPANY
+                      <span />
+                    </div>
+                  </section>
+                  <aside className="right-rail">
+                    <div className="rail-heading">
+                      <Icon name="pin" size={18} />
+                      <h2>On the noticeboard</h2>
+                      <button
+                        aria-label="View all announcements"
+                        onClick={() => navigate('announcements')}
+                      >
+                        <Icon name="arrow" size={17} />
+                      </button>
+                    </div>
+                    <div className="noticeboard">
+                      {announcements.slice(0, 2).map((a, i) => (
+                        <button
+                          key={a.id}
+                          className={'notice ' + (i === 0 ? 'cream' : 'white')}
+                          onClick={() => setModal({ type: 'notice', item: a })}
+                        >
+                          <div>
+                            <span className="eyebrow">
+                              {a.category?.toUpperCase() || 'CAMPUS'} UPDATE
+                            </span>
+                            {a.is_pinned && <Icon name="pin" size={15} />}
+                          </div>
+                          <h3>{a.title}</h3>
+                          <p>{a.content}</p>
+                          <div className="notice-bottom">
+                            <small>{date(a.created_at)}</small>
+                            <Icon name="arrow" size={17} />
+                          </div>
+                        </button>
+                      ))}
+                      {!announcements.length && (
+                        <p className="muted">
+                          New campus updates will appear here.
+                        </p>
+                      )}
+                    </div>
+                    <div className="rail-heading schedule-rail-heading">
+                      <Icon name="calendar" size={18} />
+                      <h2>
+                        {todayName() === 'Sunday' || todayName() === 'Saturday'
+                          ? 'Next up: Monday'
+                          : 'Your day ahead'}
+                      </h2>
+                      <span>{user.branch}</span>
+                    </div>
+                    <div className="day-ahead">
+                      <div className="day-ahead-top">
+                        <span>{initialDay()}</span>
+                        <small>SEM {user.semester}</small>
+                      </div>
+                      {upcoming.slice(0, 3).map((c, i) => (
+                        <div className="mini-class" key={i}>
+                          <span className="timeline-dot" />
+                          <small>{c.time}</small>
+                          <strong>{c.subject.replace(/\s*\(.*\)/, '')}</strong>
+                          <span>{c.room}</span>
+                        </div>
+                      ))}
+                      {!upcoming.length && (
+                        <p className="muted">No classes on this schedule.</p>
+                      )}
+                      <button
+                        className="rail-link"
+                        onClick={() => navigate('timetable')}
+                      >
+                        Open full timetable
+                        <Icon name="arrow" size={17} />
+                      </button>
+                    </div>
+                    <div className="community-note">
+                      <span className="scribble">↗</span>
+                      <span className="eyebrow">A SMALL REMINDER</span>
+                      <h3>
+                        Someone here knows
+                        <br />
+                        what you’re figuring out.
+                      </h3>
+                      <p>
+                        Ask the question.
+                        <br />
+                        Share the notes. Say hello.
+                      </p>
+                      <button onClick={() => setModal({ type: 'post' })}>
+                        Start something <Icon name="arrow" size={16} />
+                      </button>
+                    </div>
+                    <div className="rail-foot">
+                      NSUT CONNECT · CAMPUS COMMONS
+                      <br />
+                      Sample data · Made for connection
+                    </div>
+                  </aside>
+                </div>
+              )}
+              {page === 'timetable' && (
+                <Timetable tables={tables} user={user} notify={notify} />
+              )}
+              {page === 'profile' && (
+                <Profile
+                  key={user.id}
+                  user={user}
+                  tables={tables}
+                  posts={posts}
+                  onSave={async (body) =>
+                    updateUser(await api('/me', 'PATCH', body))
+                  }
+                  notify={notify}
+                />
+              )}
+              {page === 'admin' && user.role === 'admin' && (
+                <>
+                  <div className="page-heading">
+                    <div>
+                      <span className="eyebrow">
+                        TAKE CARE OF YOUR COMMUNITY
+                      </span>
+                      <h1>The admin studio.</h1>
+                      <p>
+                        Clear updates. Thoughtful conversations. A better
+                        commons.
+                      </p>
+                    </div>
+                    <button
+                      className="button primary"
+                      onClick={() => setModal({ type: 'announcement' })}
+                    >
+                      <Icon name="plus" size={17} />
+                      Publish announcement
+                    </button>
+                  </div>
+                  <div className="admin-stats">
+                    <div>
+                      <Icon name="bell" />
+                      <strong>{announcements.length}</strong>
+                      <span>Campus updates</span>
+                    </div>
+                    <div>
+                      <Icon name="chat" />
+                      <strong>{posts.length}</strong>
+                      <span>Conversations</span>
+                    </div>
+                    <div>
+                      <Icon name="pin" />
+                      <strong>
+                        {announcements.filter((a) => a.is_pinned).length}
+                      </strong>
+                      <span>Pinned updates</span>
+                    </div>
+                  </div>
+                  <section className="admin-panel">
+                    <div className="feed-title-row">
+                      <h2>Manage announcements</h2>
+                      <span className="muted">Visible to all students</span>
+                    </div>
+                    {announcements.map((a) => (
+                      <div className="admin-row" key={a.id}>
+                        <div>
+                          <strong>{a.title}</strong>
+                          <small>
+                            {a.posted_by} · {date(a.created_at)}
+                            {a.is_pinned ? ' · Pinned' : ''}
+                          </small>
+                        </div>
+                        <button
+                          className="icon-button"
+                          aria-label={'Edit ' + a.title}
+                          onClick={() =>
+                            setModal({ type: 'announcement', item: a })
+                          }
+                        >
+                          <Icon name="edit" size={18} />
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label={'Delete ' + a.title}
+                          onClick={() =>
+                            setModal({
+                              type: 'delete',
+                              item: a,
+                              kind: 'announcement',
+                            })
+                          }
+                        >
+                          <Icon name="trash" size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </section>
+                  <section className="admin-panel">
+                    <div className="feed-title-row">
+                      <h2>Moderate conversations</h2>
+                      <span className="muted">Keep the commons welcoming</span>
+                    </div>
+                    {posts.map((p) => (
+                      <div className="admin-row" key={p.id}>
+                        <div>
+                          <strong>{p.title}</strong>
+                          <small>
+                            {p.author} · {p.category}
+                          </small>
+                        </div>
+                        <button
+                          className="button text"
+                          onClick={() => setModal({ type: 'thread', id: p.id })}
+                        >
+                          View
+                        </button>
+                        <button
+                          className="icon-button"
+                          aria-label={'Delete ' + p.title}
+                          onClick={() => setModal({ type: 'delete', item: p })}
+                        >
+                          <Icon name="trash" size={18} />
+                        </button>
+                      </div>
+                    ))}
+                  </section>
+                </>
+              )}
+            </>
+          )}
+        </main>
+        <footer className="app-footer">
+          <span>NSUT Connect</span>
+          <span>Your campus, in good company.</span>
+          <button onClick={() => setModal({ type: 'about' })}>
+            About this prototype ↗
+          </button>
+        </footer>
+      </div>
+      {modal?.type === 'post' && (
+        <Compose user={user} onSubmit={publish} onClose={close} />
+      )}
+      {modal?.type === 'announcement' && (
+        <Compose
+          user={user}
+          announcement
+          initial={modal.item}
+          onSubmit={publish}
+          onClose={close}
+        />
+      )}
+      {thread && (
+        <Thread post={thread} user={user} onClose={close} onReply={reply} />
+      )}
+      {modal?.type === 'delete' && (
+        <Modal title="Remove this from the commons?" onClose={close}>
+          <p className="muted">
+            “{modal.item.title}” will be removed. This also removes any replies
+            on the post.
+          </p>
+          <div className="modal-footer">
+            <button className="button outline" onClick={close}>
+              Keep it
+            </button>
+            <button className="button danger" onClick={remove}>
+              Remove {modal.kind === 'announcement' ? 'announcement' : 'post'}
+              <Icon name="trash" size={16} />
+            </button>
+          </div>
+        </Modal>
+      )}
+      {modal?.type === 'notice' && (
+        <Modal title="From the noticeboard" onClose={close}>
+          <div className="notice-detail">
+            <span
+              className={
+                'tag ' + categoryClass(modal.item.category || 'Campus')
+              }
+            >
+              {modal.item.category || 'Campus'}
+            </span>
+            <h2>{modal.item.title}</h2>
+            <p>{modal.item.content}</p>
+            <div className="announcement-footer">
+              <span>
+                <Icon name="shield" size={16} />
+                {modal.item.posted_by}
+              </span>
+              <small>{date(modal.item.created_at)}</small>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {modal?.type === 'notifications' && (
+        <Modal title="Your campus updates" onClose={close}>
+          <div className="notifications-intro">
+            <p>
+              {unread
+                ? `${unread} unread updates on your noticeboard.`
+                : 'You’re all caught up.'}
+            </p>
+            <button className="button text" onClick={markRead}>
+              Mark all read
+              <Icon name="check" size={16} />
+            </button>
+          </div>
+          {announcements.map((a) => (
+            <button
+              className={
+                'notification-row ' + (!read.includes(a.id) ? 'unread' : '')
+              }
+              key={a.id}
+              onClick={() => {
+                const next = [...new Set([...read, a.id])]
+                setRead(next)
+                localStorage.setItem('nsut-read', JSON.stringify(next))
+                setModal({ type: 'notice', item: a })
+              }}
+            >
+              <span>
+                <Icon name="bell" />
+              </span>
+              <div>
+                <strong>{a.title}</strong>
+                <small>
+                  {a.posted_by} · {date(a.created_at)}
+                </small>
+              </div>
+              <Icon name="chevron" size={16} />
+            </button>
+          ))}
+          {!announcements.length && (
+            <Empty
+              icon="bell"
+              title="A quiet moment."
+              description="Campus announcements will appear here."
+            />
+          )}
+        </Modal>
+      )}
+      {modal?.type === 'about' && (
+        <Modal title="A commons for your campus." onClose={close}>
+          <div className="about-copy">
+            <Brand />
+            <p>
+              NSUT Connect brings student conversations, campus announcements,
+              and your timetable into one familiar place.
+            </p>
+            <h3>A working campus prototype</h3>
+            <p>
+              {isHostedDemo
+                ? 'This online version runs with sample data saved in your browser. Open it on the same device to find your changes.'
+                : 'This local version uses the FastAPI server and saves sample data to a JSON file.'}{' '}
+              Timetables are transcribed from the supplied July–December 2026
+              PDF. Notices and discussions are sample data.
+            </p>
+            <h3>Made to feel like community</h3>
+            <p>
+              Ask questions, reply to peers, bookmark useful posts, and keep
+              your week in view. Admins can publish and manage announcements.
+            </p>
+            <p className="form-note">
+              Demo accounts are for exploring roles. Google sign-in is available
+              in the local app when an administrator configures it.
+            </p>
+          </div>
+        </Modal>
+      )}
+      {toast && (
+        <div className="toast" role="status">
+          <Icon name="check" size={18} />
+          {toast}
+          <button
+            onClick={() => setToast('')}
+            aria-label="Dismiss notification"
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
-
-function Profile({user,tables,posts,onSave,notify}) {
-  const [editing,setEditing]=useState(false),[name,setName]=useState(user.name),[bio,setBio]=useState(user.bio||''),[branch,setBranch]=useState(user.branch),[semester,setSemester]=useState(user.semester),[busy,setBusy]=useState(false),[error,setError]=useState('')
-  async function save(e){e.preventDefault();setBusy(true);try{await onSave({name:name.trim(),bio:bio.trim(),branch,semester});setEditing(false);notify('Profile updated. Make yourself at home.')}catch(err){setError(err.message)}finally{setBusy(false)}}
-  return <><div className="page-heading"><div><span className="eyebrow">YOUR CORNER OF CAMPUS</span><h1>A familiar face.</h1><p>The person behind the conversations.</p></div></div><section className="profile-panel"><div className="profile-cover"><CampusDrawing/><span>YOU BELONG HERE.</span></div><div className="profile-intro"><Avatar name={user.name} large/><button className="button outline" onClick={()=>setEditing(!editing)}><Icon name="edit" size={17}/>{editing?'Close editor':'Edit profile'}</button></div><div className="profile-body"><span className="tag campus">{user.role==='admin'?'Administrator':'Student'}</span><h2>{user.name}</h2><p className="muted">{user.email}</p><p>{user.bio||'Tell your campus a little about yourself.'}</p><div className="profile-meta"><span><Icon name="book" size={17}/>{user.branch} · Semester {user.semester}</span><span><Icon name="location" size={17}/>NSUT, New Delhi</span></div><div className="profile-stats"><div><strong>{posts.filter(p=>p.author_email===user.email).length}</strong><span>Conversations</span></div><div><strong>{user.saved?.length||0}</strong><span>Saved posts</span></div><div><strong>{posts.reduce((sum,p)=>sum+(p.comments||[]).filter(c=>c.author===user.name).length,0)}</strong><span>Replies</span></div></div>{editing&&<form className="profile-form" onSubmit={save}><label>Name<input required minLength={2} maxLength={80} value={name} onChange={e=>setName(e.target.value)}/></label><label>A little about you<textarea rows={3} maxLength={280} value={bio} onChange={e=>setBio(e.target.value)}/></label><div className="two-fields"><label>Branch<select value={branch} onChange={e=>{setBranch(e.target.value);setSemester(Object.keys(tables[e.target.value]||{})[0])}}>{Object.keys(tables).map(b=><option key={b}>{b}</option>)}</select></label><label>Semester<select value={semester} onChange={e=>setSemester(e.target.value)}>{Object.keys(tables[branch]||{}).map(s=><option key={s}>{s}</option>)}</select></label></div>{error&&<p className="form-error" role="alert">{error}</p>}<button className="button primary" disabled={busy}>{busy?'Saving…':'Save profile'}<Icon name="check" size={17}/></button></form>}</div></section></>
-}
-
-export default function App() {
-  const [auth,setAuth]=useState(session),[config,setConfig]=useState({google_client_id:'',demo:true}),[page,setPage]=useState(location.hash.slice(1)||'feed'),[posts,setPosts]=useState([]),[announcements,setAnnouncements]=useState([]),[tables,setTables]=useState({}),[loading,setLoading]=useState(!!session()),[error,setError]=useState(''),[category,setCategory]=useState('All'),[sort,setSort]=useState('latest'),[query,setQuery]=useState(''),[modal,setModal]=useState(null),[toast,setToast]=useState(''),[mobile,setMobile]=useState(false),[online,setOnline]=useState(navigator.onLine),[read,setRead]=useState(()=>{try{return JSON.parse(localStorage.getItem('nsut-read')||'[]')}catch{return[]}})
-  const search=useRef(null),toastTimer=useRef(null)
-  const user=auth?.user
-  function notify(message){setToast(message);clearTimeout(toastTimer.current);toastTimer.current=setTimeout(()=>setToast(''),4000)}
-  function navigate(value){location.hash=value;setPage(value);setMobile(false);setQuery('');setCategory('All');window.scrollTo({top:0})}
-  function login(value){storeSession(value);setAuth(value);setError('');navigate('feed')}
-  function updateUser(value){const next={...session(),user:value};storeSession(next);setAuth(next)}
-  async function load(){setLoading(true);setError('');try{const [me,p,a,t]=await Promise.all([api('/me'),api('/posts'),api('/announcements'),api('/timetable')]);updateUser(me);setPosts(p);setAnnouncements(a);setTables(t);localStorage.setItem('nsut-offline-timetable',JSON.stringify(t));localStorage.setItem('nsut-offline-data',JSON.stringify({p,a}))}catch(err){setError(err.message);if(!navigator.onLine){try{setTables(JSON.parse(localStorage.getItem('nsut-offline-timetable')||'{}'));const cache=JSON.parse(localStorage.getItem('nsut-offline-data')||'{}');setPosts(cache.p||[]);setAnnouncements(cache.a||[])}catch{/* no cache */}}}finally{setLoading(false)}}
-  useEffect(()=>{api('/config').then(setConfig).catch(()=>{});const expired=()=>{setAuth(null);setModal(null)};const hash=()=>setPage(location.hash.slice(1)||'feed');const connection=()=>setOnline(navigator.onLine);const shortcut=e=>{if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();search.current?.focus()}};window.addEventListener('session-expired',expired);window.addEventListener('hashchange',hash);window.addEventListener('online',connection);window.addEventListener('offline',connection);window.addEventListener('keydown',shortcut);return()=>{clearTimeout(toastTimer.current);window.removeEventListener('session-expired',expired);window.removeEventListener('hashchange',hash);window.removeEventListener('online',connection);window.removeEventListener('offline',connection);window.removeEventListener('keydown',shortcut)}},[])
-  useEffect(()=>{if(auth)load()},[auth?.token])
-  useEffect(()=>{const valid=['feed','discussions','announcements','timetable','saved','profile','admin'];if(!valid.includes(page)||(page==='admin'&&user?.role!=='admin')){setPage('feed');location.hash='feed'}},[page,user?.role])
-  async function logout(){try{await api('/auth/logout','POST')}catch{}storeSession(null);setAuth(null);setModal(null);setPosts([]);setAnnouncements([]);setRead([]);localStorage.removeItem('nsut-read')}
-  async function like(postId){try{const p=await api(`/posts/${postId}/like`,'POST');setPosts(items=>items.map(i=>i.id===p.id?p:i))}catch(err){notify(err.message)}}
-  async function savePost(postId){try{const u=await api(`/posts/${postId}/save`,'POST');updateUser(u);notify(u.saved.includes(postId)?'Saved to your collection.':'Removed from saved posts.')}catch(err){notify(err.message)}}
-  async function publish(body){if(modal.type==='announcement'){const item=await api(modal.item?`/announcements/${modal.item.id}`:'/announcements',modal.item?'PATCH':'POST',body);setAnnouncements(items=>[item,...items.filter(i=>i.id!==item.id)].sort((a,b)=>Number(b.is_pinned)-Number(a.is_pinned)||b.id-a.id));notify(modal.item?'Announcement updated.':'Announcement published.')}else{const p=await api('/posts','POST',body);setPosts(items=>[p,...items]);setCategory('All');notify('Your conversation is live.')}setModal(null)}
-  async function reply(postId,content){const p=await api(`/posts/${postId}/comments`,'POST',{content});setPosts(items=>items.map(i=>i.id===p.id?p:i));notify('Reply posted.')}
-  async function remove(){try{await api(modal.kind==='announcement'?`/announcements/${modal.item.id}`:`/posts/${modal.item.id}`,'DELETE');if(modal.kind==='announcement')setAnnouncements(items=>items.filter(i=>i.id!==modal.item.id));else {setPosts(items=>items.filter(i=>i.id!==modal.item.id));updateUser({...user,saved:(user.saved||[]).filter(id=>id!==modal.item.id)})}setModal(null);notify('Removed successfully.')}catch(err){notify(err.message)}}
-  function markRead(){const ids=announcements.map(a=>a.id);setRead(ids);localStorage.setItem('nsut-read',JSON.stringify(ids));notify('You’re all caught up.')}
-  const filtered=posts.filter(p=>(category==='All'||p.category===category)&&(`${p.title} ${p.content} ${p.author}`.toLowerCase().includes(query.toLowerCase()))&&(page!=='saved'||user?.saved?.includes(p.id))).sort((a,b)=>sort==='popular'?b.likes-a.likes:b.id-a.id)
-  const visibleAnnouncements=announcements.filter(a=>(category==='All'||a.category===category)&&`${a.title} ${a.content} ${a.posted_by}`.toLowerCase().includes(query.toLowerCase()))
-  const thread=modal?.type==='thread'?posts.find(p=>p.id===modal.id):null
-  const unread=announcements.filter(a=>!read.includes(a.id)).length
-  const upcoming=tables[user?.branch]?.[user?.semester]?.filter(c=>c.day===initialDay())||[]
-  const close=()=>setModal(null)
-  if(!auth) return <Login onLogin={login} config={config}/>
-  return <div className="app-shell"><a className="skip-link" href="#main" onClick={e=>{e.preventDefault();document.getElementById("main")?.focus()}}>Skip to content</a>{mobile&&<button className="sidebar-scrim" aria-label="Close menu" onClick={()=>setMobile(false)}/>}<aside className={'sidebar '+(mobile?'open':'')}><Brand/><div className="campus-label"><span className="live-dot"/>THE STUDENT COMMONS</div><nav aria-label="Main navigation">{navigation.map(([value,icon,label])=><button key={value} className={page===value?'nav-item selected':'nav-item'} onClick={()=>navigate(value)}><Icon name={icon}/>{label}{value==='announcements'&&unread>0&&<span className="nav-count">{unread}</span>}</button>)}</nav><div className="nav-separator"/><span className="sidebar-section-label">YOUR SPACE</span><button className={'nav-item '+(page==='profile'?'selected':'')} onClick={()=>navigate('profile')}><Icon name="user"/>My profile</button>{user.role==='admin'&&<button className={'nav-item '+(page==='admin'?'selected':'')} onClick={()=>navigate('admin')}><Icon name="shield"/>Admin studio</button>}<div className="sidebar-bottom"><div className="commons-note"><Icon name="spark" size={25}/><strong>Better, together.</strong><p>A place for your people,<br/>your questions, your ideas.</p><button onClick={()=>setModal({type:'about'})}>About the commons <Icon name="arrow" size={16}/></button></div><button className="sidebar-user" onClick={()=>navigate('profile')}><Avatar name={user.name}/><span><strong>{user.name}</strong><small>{user.branch} · Semester {user.semester}</small></span><Icon name="chevron" size={16}/></button><button className="signout" onClick={logout}><Icon name="logout" size={15}/>Sign out<span>{isHostedDemo?'BROWSER DEMO':'LOCAL API'}</span></button></div></aside><div className="workspace"><header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-menu" onClick={()=>setMobile(!mobile)} aria-label="Open menu"><Icon name="menu"/></button><span>Campus</span><Icon name="chevron" size={13}/><strong>{[...navigation,['profile','','My profile'],['admin','','Admin studio']].find(n=>n[0]===page)?.[2]}</strong></div><div className="topbar-actions"><div className="search-box"><Icon name="search" size={17}/><input ref={search} aria-label="Search posts and announcements" placeholder="Search your campus" value={query} onChange={e=>{setQuery(e.target.value);if(['profile','admin','timetable'].includes(page)){location.hash='feed';setPage('feed');setCategory('All')}}}/><kbd>⌘ K</kbd>{query&&<button onClick={()=>setQuery('')} aria-label="Clear search"><Icon name="close" size={14}/></button>}</div><button className="notification-button icon-button" onClick={()=>setModal({type:'notifications'})} aria-label={`Notifications, ${unread} unread`}><Icon name="bell"/>{unread>0&&<i/>}</button><button className="top-avatar" aria-label="Open your profile" onClick={()=>navigate('profile')}><Avatar name={user.name}/></button></div></header><main id="main" tabIndex={-1} className={'main '+(['timetable','profile','admin'].includes(page)?'full-page':'')}>
-  {!online&&<div className="status-banner"><Icon name="calendar" size={18}/>You’re offline. Your cached timetable is still here.</div>}
-  {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={load}>Try again <Icon name="arrow" size={15}/></button></div>}
-  {loading?<div className="loading-state"><span className="loading-spinner"/><h2>Gathering your campus…</h2></div>:<>
-  {['feed','discussions','saved','announcements'].includes(page)&&<div className="content-grid"><section className="primary-content">
-  {page==='feed'&&<><div className="welcome-heading"><span className="eyebrow">{new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',timeZone:'Asia/Kolkata'}).toUpperCase()}</span><h1>Hey {user.name.split(' ')[0]}, you’re home<span className="greeting-star">✳</span></h1><p>Here’s what’s happening in your corner of campus.</p></div><div className="welcome-banner"><div><span className="eyebrow">YOUR CAMPUS. YOUR PEOPLE.</span><h2>Good things start<br/>with a conversation.</h2><button onClick={()=>{navigate('discussions')}}>Find your next one <Icon name="arrow" size={17}/></button></div><CampusDrawing/><span className="banner-edition">THE COMMONS / VOL. 01</span></div><button className="composer" onClick={()=>setModal({type:'post'})}><Avatar name={user.name}/><span>Got a question, an idea, or a little campus news?</span><span className="composer-plus"><Icon name="plus"/></span></button></>}
-  {page==='discussions'&&<><div className="page-heading"><div><span className="eyebrow">ASK. SHARE. FIGURE IT OUT TOGETHER.</span><h1>Let’s talk campus.</h1><p>A good question can take you somewhere new.</p></div><button className="button primary" onClick={()=>setModal({type:'post'})}><Icon name="plus" size={17}/>New conversation</button></div><div className="topic-grid">{categories.slice(0,4).map((c,i)=><button key={c} className={'topic '+categoryClass(c)+(category===c?' chosen':'')} onClick={()=>setCategory(category===c?'All':c)}><Icon name={['book','sun','spark','home'][i]} size={24}/><strong>{c}</strong><span>{posts.filter(p=>p.category===c).length} conversations</span><Icon name="arrow" size={17}/></button>)}</div></>}
-  {page==='saved'&&<div className="page-heading"><div><span className="eyebrow">KEEP THE GOOD STUFF CLOSE</span><h1>Worth coming back to.</h1><p>Your bookmarked conversations, all in one place.</p></div><span className="count-pill">{posts.filter(p=>user.saved?.includes(p.id)).length} saved</span></div>}
-  {page==='announcements'&&<div className="page-heading"><div><span className="eyebrow">THE CAMPUS NOTICEBOARD</span><h1>Stay in the loop.</h1><p>Updates that deserve a place on your radar.</p></div>{user.role==='admin'&&<button className="button primary" onClick={()=>setModal({type:'announcement'})}><Icon name="plus" size={17}/>New update</button>}</div>}
-  <div className="feed-title-row"><h2>{query?'Search results':page==='announcements'?'Campus updates':page==='saved'?'Your collection':'The conversation'}</h2>{page!=='announcements'&&<label className="sort-control"><span className="sr-only">Sort conversations</span><select value={sort} onChange={e=>setSort(e.target.value)}><option value="latest">Latest first</option><option value="popular">Most liked</option></select></label>}</div><div className="filter-tabs" aria-label="Filter by topic">{['All',...categories].map(c=><button key={c} className={category===c?'selected':''} onClick={()=>setCategory(c)} aria-pressed={category===c}>{c==='All'?'For you':c}</button>)}</div>
-  {page==='announcements'?<div className="announcement-list">{visibleAnnouncements.map(a=><article className={'announcement-card '+(a.is_pinned?'pinned':'')} key={a.id}><div className="announcement-meta"><span className={'tag '+categoryClass(a.category)}>{a.category}</span>{a.is_pinned&&<span className="pinned-label"><Icon name="pin" size={14}/>PINNED UPDATE</span>}<small>{date(a.created_at)}</small></div><h2>{a.title}</h2><p>{a.content}</p><div className="announcement-footer"><span><Icon name="shield" size={16}/>{a.posted_by}</span>{user.role==='admin'&&<div><button className="icon-button" aria-label={'Edit '+a.title} onClick={()=>setModal({type:'announcement',item:a})}><Icon name="edit" size={17}/></button><button className="icon-button" aria-label={'Delete '+a.title} onClick={()=>setModal({type:'delete',item:a,kind:'announcement'})}><Icon name="trash" size={17}/></button></div>}</div></article>)}{!visibleAnnouncements.length&&<Empty icon="bell" title="Nothing on this board yet." description="Try a different topic or search."/>}</div>:<div className="post-list">{filtered.map(p=><PostCard key={p.id} post={p} user={user} onLike={like} onSave={savePost} onOpen={id=>setModal({type:'thread',id})} onDelete={item=>setModal({type:'delete',item})}/>)}{!filtered.length&&<Empty icon={page==='saved'?'bookmark':'search'} title={page==='saved'?'A place for your favourites.':'No conversations found.'} description={page==='saved'?'Tap the bookmark on any post to keep it here.':'Try another topic or start something new.'} action={<button className="button outline" onClick={()=>page==='saved'?navigate('feed'):setModal({type:'post'})}>{page==='saved'?'Explore the feed':'Start a conversation'}<Icon name="arrow" size={16}/></button>}/>}</div>}
-  <div className="feed-end"><span/>YOU’RE IN GOOD COMPANY<span/></div>
-  </section><aside className="right-rail"><div className="rail-heading"><Icon name="pin" size={18}/><h2>On the noticeboard</h2><button aria-label="View all announcements" onClick={()=>navigate('announcements')}><Icon name="arrow" size={17}/></button></div><div className="noticeboard">{announcements.slice(0,2).map((a,i)=><button key={a.id} className={'notice '+(i===0?'cream':'white')} onClick={()=>setModal({type:'notice',item:a})}><div><span className="eyebrow">{a.category?.toUpperCase()||'CAMPUS'} UPDATE</span>{a.is_pinned&&<Icon name="pin" size={15}/>}</div><h3>{a.title}</h3><p>{a.content}</p><div className="notice-bottom"><small>{date(a.created_at)}</small><Icon name="arrow" size={17}/></div></button>)}{!announcements.length&&<p className="muted">New campus updates will appear here.</p>}</div><div className="rail-heading schedule-rail-heading"><Icon name="calendar" size={18}/><h2>{todayName()==='Sunday'||todayName()==='Saturday'?'Next up: Monday':'Your day ahead'}</h2><span>{user.branch}</span></div><div className="day-ahead"><div className="day-ahead-top"><span>{initialDay()}</span><small>SEM {user.semester}</small></div>{upcoming.slice(0,3).map((c,i)=><div className="mini-class" key={i}><span className="timeline-dot"/><small>{c.time}</small><strong>{c.subject.replace(/\s*\(.*\)/,'')}</strong><span>{c.room}</span></div>)}{!upcoming.length&&<p className="muted">No classes on the sample schedule.</p>}<button className="rail-link" onClick={()=>navigate('timetable')}>Open full timetable<Icon name="arrow" size={17}/></button></div><div className="community-note"><span className="scribble">↗</span><span className="eyebrow">A SMALL REMINDER</span><h3>Someone here knows<br/>what you’re figuring out.</h3><p>Ask the question.<br/>Share the notes. Say hello.</p><button onClick={()=>setModal({type:'post'})}>Start something <Icon name="arrow" size={16}/></button></div><div className="rail-foot">NSUT CONNECT · CAMPUS COMMONS<br/>Sample data · Made for connection</div></aside></div>}
-  {page==='timetable'&&<Timetable tables={tables} user={user} notify={notify}/>}
-  {page==='profile'&&<Profile key={user.id} user={user} tables={tables} posts={posts} onSave={async body=>updateUser(await api('/me','PATCH',body))} notify={notify}/>}
-  {page==='admin'&&user.role==='admin'&&<><div className="page-heading"><div><span className="eyebrow">TAKE CARE OF YOUR COMMUNITY</span><h1>The admin studio.</h1><p>Clear updates. Thoughtful conversations. A better commons.</p></div><button className="button primary" onClick={()=>setModal({type:'announcement'})}><Icon name="plus" size={17}/>Publish announcement</button></div><div className="admin-stats"><div><Icon name="bell"/><strong>{announcements.length}</strong><span>Campus updates</span></div><div><Icon name="chat"/><strong>{posts.length}</strong><span>Conversations</span></div><div><Icon name="pin"/><strong>{announcements.filter(a=>a.is_pinned).length}</strong><span>Pinned updates</span></div></div><section className="admin-panel"><div className="feed-title-row"><h2>Manage announcements</h2><span className="muted">Visible to all students</span></div>{announcements.map(a=><div className="admin-row" key={a.id}><div><strong>{a.title}</strong><small>{a.posted_by} · {date(a.created_at)}{a.is_pinned?' · Pinned':''}</small></div><button className="icon-button" aria-label={'Edit '+a.title} onClick={()=>setModal({type:'announcement',item:a})}><Icon name="edit" size={18}/></button><button className="icon-button" aria-label={'Delete '+a.title} onClick={()=>setModal({type:'delete',item:a,kind:'announcement'})}><Icon name="trash" size={18}/></button></div>)}</section><section className="admin-panel"><div className="feed-title-row"><h2>Moderate conversations</h2><span className="muted">Keep the commons welcoming</span></div>{posts.map(p=><div className="admin-row" key={p.id}><div><strong>{p.title}</strong><small>{p.author} · {p.category}</small></div><button className="button text" onClick={()=>setModal({type:'thread',id:p.id})}>View</button><button className="icon-button" aria-label={'Delete '+p.title} onClick={()=>setModal({type:'delete',item:p})}><Icon name="trash" size={18}/></button></div>)}</section></>}
-  </>}
-  </main><footer className="app-footer"><span>NSUT Connect</span><span>Your campus, in good company.</span><button onClick={()=>setModal({type:'about'})}>About this prototype ↗</button></footer></div>
-  {modal?.type==='post'&&<Compose user={user} onSubmit={publish} onClose={close}/>}{modal?.type==='announcement'&&<Compose user={user} announcement initial={modal.item} onSubmit={publish} onClose={close}/>}{thread&&<Thread post={thread} user={user} onClose={close} onReply={reply}/>}
-  {modal?.type==='delete'&&<Modal title="Remove this from the commons?" onClose={close}><p className="muted">“{modal.item.title}” will be removed. This also removes any replies on the post.</p><div className="modal-footer"><button className="button outline" onClick={close}>Keep it</button><button className="button danger" onClick={remove}>Remove {modal.kind==='announcement'?'announcement':'post'}<Icon name="trash" size={16}/></button></div></Modal>}
-  {modal?.type==='notice'&&<Modal title="From the noticeboard" onClose={close}><div className="notice-detail"><span className={'tag '+categoryClass(modal.item.category||'Campus')}>{modal.item.category||'Campus'}</span><h2>{modal.item.title}</h2><p>{modal.item.content}</p><div className="announcement-footer"><span><Icon name="shield" size={16}/>{modal.item.posted_by}</span><small>{date(modal.item.created_at)}</small></div></div></Modal>}
-  {modal?.type==='notifications'&&<Modal title="Your campus updates" onClose={close}><div className="notifications-intro"><p>{unread?`${unread} unread updates on your noticeboard.`:'You’re all caught up.'}</p><button className="button text" onClick={markRead}>Mark all read<Icon name="check" size={16}/></button></div>{announcements.map(a=><button className={'notification-row '+(!read.includes(a.id)?'unread':'')} key={a.id} onClick={()=>{const next=[...new Set([...read,a.id])];setRead(next);localStorage.setItem('nsut-read',JSON.stringify(next));setModal({type:'notice',item:a})}}><span><Icon name="bell"/></span><div><strong>{a.title}</strong><small>{a.posted_by} · {date(a.created_at)}</small></div><Icon name="chevron" size={16}/></button>)}{!announcements.length&&<Empty icon="bell" title="A quiet moment." description="Campus announcements will appear here."/>}</Modal>}
-  {modal?.type==='about'&&<Modal title="A commons for your campus." onClose={close}><div className="about-copy"><Brand/><p>NSUT Connect brings student conversations, campus announcements, and your timetable into one familiar place.</p><h3>A working campus prototype</h3><p>{isHostedDemo?'This online version runs with sample data saved in your browser. Open it on the same device to find your changes.':'This local version uses the FastAPI server and saves sample data to a JSON file.'} Timetables and notices are illustrative, not official university information.</p><h3>Made to feel like community</h3><p>Ask questions, reply to peers, bookmark useful posts, and keep your week in view. Admins can publish and manage announcements.</p><p className="form-note">Demo accounts are for exploring roles. Google sign-in is available in the local app when an administrator configures it.</p></div></Modal>}
-  {toast&&<div className="toast" role="status"><Icon name="check" size={18}/>{toast}<button onClick={()=>setToast('')} aria-label="Dismiss notification"><Icon name="close" size={16}/></button></div>}
-  </div>
-}
-
-
-

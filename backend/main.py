@@ -23,7 +23,6 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 ALLOW_DEMO = os.environ.get("ALLOW_DEMO", "true").lower() == "true"
 ADMIN_EMAILS = {s.strip().lower() for s in os.environ.get("ADMIN_EMAILS", "").split(",") if s.strip()}
 data = {"users": copy.deepcopy(store.USERS), "posts": copy.deepcopy(store.POSTS), "announcements": copy.deepcopy(store.ANNOUNCEMENTS), "timetables": copy.deepcopy(store.TIMETABLES)}
-data["users"][1].update(name="Yash Sharma", branch="CSE", semester="1", bio="First-year student. Building things, finding my people.")
 for user in data["users"]:
     user.setdefault("branch", "CSE")
     user.setdefault("semester", "1")
@@ -35,6 +34,13 @@ for announcement in data["announcements"]:
     announcement.setdefault("category", "Academics" if announcement["is_pinned"] else "Campus")
 if DATA_PATH.exists():
     data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
+
+# Timetables are reference data; refresh them even when saved posts exist.
+data["timetables"] = copy.deepcopy(store.TIMETABLES)
+for user in data["users"]:
+    if user["email"] == "student@nsut.ac.in" and user["name"] in {"Yash Sharma", "Benjamin Netanyahu"}:
+        user["name"] = "Student"
+        user["bio"] = ""
 
 def persist():
     DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -253,8 +259,10 @@ def delete_announcement(item_id: int, user=Depends(admin)):
     return {"ok": True}
 
 @app.get("/api/timetable")
-def timetable(branch: str | None = None, semester: str | None = None, user=Depends(current_user)):
+def timetable(branch: str | None = None, semester: str | None = None, section: str | None = None, user=Depends(current_user)):
     if not branch or not semester:
         return data["timetables"]
     classes = data["timetables"].get(branch.upper(), {}).get(semester, [])
-    return {"branch": branch.upper(), "semester": semester, "days": {day: [c for c in classes if c["day"] == day] for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]}}
+    selected_section = section or (classes[0]["section"] if classes else "All slots")
+    classes = [item for item in classes if item["section"] == selected_section]
+    return {"branch": branch.upper(), "semester": semester, "section": selected_section, "days": {day: [c for c in classes if c["day"] == day] for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]}}

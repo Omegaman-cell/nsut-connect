@@ -60,11 +60,19 @@ class CampusAPI(unittest.TestCase):
     def test_timetable_profile_and_validation(self):
         table=self.client.get("/api/timetable?branch=cse&semester=1",headers=self.student).json()
         self.assertIn("Monday",table["days"])
-        self.assertEqual(len(table["days"]["Monday"]),4)
+        self.assertEqual(len(table["days"]["Monday"]),5)
+        self.assertEqual(table["days"]["Monday"][0]["time"], "08:00–10:00")
+        self.assertEqual(table["days"]["Monday"][-1]["subject"], "Fundamentals of Electrical Engineering Lab")
+        self.assertEqual(table["days"]["Monday"][-1]["time"], "16:00–18:00")
+        section_two = self.client.get("/api/timetable?branch=cse&semester=1&section=2", headers=self.student).json()
+        self.assertEqual(section_two["days"]["Monday"][0]["subject"], "Mathematics-I")
+        self.assertEqual(section_two["days"]["Monday"][0]["time"], "10:00–11:00")
+        self.assertEqual(section_two["days"]["Monday"][1]["time"], "11:00–13:00")
+        self.assertEqual(self.client.get("/api/me", headers=self.student).json()["name"], "Student")
         self.assertEqual(len(table["days"]["Sunday"]),0)
-        body={"name":"Yash Sharma","bio":"Making things.","branch":"CSDS","semester":"5"}
+        body={"name":"Test Student","bio":"Making things.","branch":"CSDS","semester":"5"}
         self.assertEqual(self.client.patch("/api/me",headers=self.student,json=body).json()["branch"],"CSDS")
-        body["semester"]="1"
+        body["semester"]="2"
         self.assertEqual(self.client.patch("/api/me",headers=self.student,json=body).status_code,400)
         invalid={"title":"   ","content":"    ","category":"Campus"}
         self.assertEqual(self.client.post("/api/posts",headers=self.student,json=invalid).status_code,400)

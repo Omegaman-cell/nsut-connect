@@ -38,7 +38,7 @@ API documentation: http://127.0.0.1:8000/docs.
 - Dedicated discussion topics, saved collection, and complete announcement details.
 - Admin announcement creation, editing, pinning, removal, and post moderation.
 - Profile editing with available branch/semester choices.
-- All supplied timetable data: CSE (1, 7), CSAI (1, 7), CSDS (5), MAC (5). Day/week views and CSV download.
+- All supplied timetable data: CSE (1, 7), CSAI (1, 7), CSDS (1, 5, 7), MAC (1, 5, 7). PDF-derived July–December 2026 schedules, CSE/CSAI section selection, day/week views and CSV download.
 - Notification inbox with unread indicators and mark-as-read.
 - Mobile navigation, accessible form labels, keyboard focus, modal focus trap, Escape to close, and Ctrl/Cmd+K search.
 - Installable web manifest and service worker for the production build. After visiting the production app, cached timetable content can be viewed offline. This is a responsive web app/PWA, not a native Android or iOS binary.
@@ -49,7 +49,7 @@ The local app reads sample data from `backend/store.py`, serves it through real 
 
 When deployed as a static frontend, the app supports the **frontend submission track**: it uses the same sample dataset through a browser-local API adapter. Its data is stored in that browser and is not shared between devices. A static deployment does not host Python or provide production campus authentication. Running the app locally provides the full FastAPI implementation.
 
-Demo accounts: `student@nsut.ac.in` and `admin@nsut.ac.in`. No passwords are needed for these clearly labelled demo roles. All notices and schedules are illustrative sample data, not official live university information.
+Demo accounts: `student@nsut.ac.in` and `admin@nsut.ac.in`. No passwords are needed for these clearly labelled demo roles. Notices are sample data. Timetables are transcribed from the supplied July–December 2026 PDF; unlisted details and elective alternatives are labelled explicitly.
 
 ### Enable actual Google sign-in in the local app
 
@@ -75,4 +75,4 @@ Four API integration tests cover authentication/authorization boundaries, post/r
 
 ## Project structure
 
-`frontend/src/App.jsx` contains the screens and flows. `App.css` contains the design system and responsive layouts. `api.js` routes local requests to FastAPI and hosted requests to the browser demo adapter. `backend/main.py` implements the API; `store.py` preserves the supplied seed data.
+Start with [CODE_GUIDE.md](CODE_GUIDE.md) for the reading order and an interaction walkthrough. [DEPENDENCIES.md](DEPENDENCIES.md) lists the complete stack, direct package versions, development tools and all frontend transitive dependencies.
