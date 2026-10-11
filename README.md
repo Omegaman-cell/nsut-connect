@@ -1,5 +1,7 @@
 # NSUT Connect
 
+[Live app](https://nsut-connect.nsut-campus.workers.dev)
+
 A campus app for discussions, announcements and timetables. Sign in with an @nsut.ac.in Google account.
 
 ## Run locally
