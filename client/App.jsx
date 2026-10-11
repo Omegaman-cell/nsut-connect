@@ -58,7 +58,7 @@ export default function App() {
     localStorage.setItem('nsut-theme', theme)
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', theme === 'dark' ? '#171d1a' : '#f4f5f1')
+      ?.setAttribute('content', theme === 'dark' ? '#111214' : '#f4f5f1')
   }, [theme])
   function toggleTheme() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))

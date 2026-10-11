@@ -27,22 +27,54 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --bg: #171d1a;
-  --surface: #202823;
-  --surface-muted: #29332c;
-  --text: #e5eae2;
-  --muted: #a0aca2;
-  --line: #354239;
-  --accent: #b3c9b4;
-  --accent-soft: #303f33;
-  --on-accent: #1c2c20;
-  --sidebar: #1b231e;
-  --poster: #223b30;
-  --poster-text: #edf1e3;
+  --bg: #111214;
+  --surface: #1b1d20;
+  --surface-muted: #25272b;
+  --text: #f0f1f3;
+  --muted: #a0a5ae;
+  --line: #303238;
+  --accent: #b8ccbd;
+  --accent-soft: #252c28;
+  --on-accent: #17221b;
+  --sidebar: #151619;
+  --poster: #1b1e22;
+  --poster-text: #e3e7e5;
   --error: #ed9999;
   --error-bg: #392529;
   --backdrop: rgba(0,0,0,.65);
-  --shadow: 0 3px 12px rgba(0,0,0,.06);
+  --shadow: 0 4px 16px rgba(0,0,0,.12);
+}
+
+/* Dark surfaces stay neutral; green marks actions and selections. */
+:root[data-theme='dark'] .topbar {
+  background: var(--sidebar);
+}
+
+:root[data-theme='dark'] .nav-item.selected {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+:root[data-theme='dark'] .nav-item.selected svg {
+  color: var(--accent);
+}
+
+:root[data-theme='dark'] .avatar {
+  background: var(--surface-muted);
+  color: #d1d5d9;
+}
+
+:root[data-theme='dark'] .notice.cream {
+  background: var(--surface);
+  border-color: var(--line);
+  border-left: 2px solid var(--accent);
+}
+
+:root[data-theme='dark'] .post-content,
+:root[data-theme='dark'] .notice p,
+:root[data-theme='dark'] .announcement-card > p,
+:root[data-theme='dark'] .notice-detail > p {
+  color: #c1c5cc;
 }
 
 /* Common elements */
