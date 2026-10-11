@@ -5,7 +5,6 @@ import { selectedSection } from './timetable'
 import {
   categories,
   navigation,
-  todayName,
   initialDay,
   date,
   categoryClass,
@@ -20,6 +19,7 @@ import {
   Empty,
 } from './components'
 import Login from './pages/Login'
+import Feed from './pages/Feed'
 import Timetable from './pages/Timetable'
 import Profile from './pages/Profile'
 import ThemeButton from './ThemeButton'
@@ -358,7 +358,7 @@ export default function App() {
           </button>
         )}
         <div className="sidebar-bottom">
-          <button className="sidebar-user" onClick={() => navigate('profile')}>
+          <div className="sidebar-user">
             <Avatar name={user.name} />
             <span>
               <strong>{user.name}</strong>
@@ -366,8 +366,7 @@ export default function App() {
                 {user.branch} · Semester {user.semester}
               </small>
             </span>
-            <Icon name="chevron" size={16} />
-          </button>
+          </div>
           <button className="signout" onClick={logout}>
             <Icon name="logout" size={15} />
             Sign out
@@ -407,9 +406,9 @@ export default function App() {
                 value={query}
                 onChange={(e) => {
                   setQuery(e.target.value)
-                  if (['profile', 'admin', 'timetable'].includes(page)) {
-                    location.hash = 'feed'
-                    setPage('feed')
+                  if (['feed', 'profile', 'admin', 'timetable'].includes(page)) {
+                    location.hash = 'discussions'
+                    setPage('discussions')
                     setCategory('All')
                   }
                 }}
@@ -428,13 +427,6 @@ export default function App() {
             >
               <Icon name="bell" />
               {unread > 0 && <i />}
-            </button>
-            <button
-              className="top-avatar"
-              aria-label="Open your profile"
-              onClick={() => navigate('profile')}
-            >
-              <Avatar name={user.name} />
             </button>
           </div>
         </header>
@@ -469,39 +461,22 @@ export default function App() {
             </div>
           ) : (
             <>
-              {['feed', 'discussions', 'saved', 'announcements'].includes(
+              {page === 'feed' && (
+                <Feed
+                  posts={posts}
+                  announcements={announcements}
+                  upcoming={upcoming}
+                  user={user}
+                  onNavigate={navigate}
+                  onOpenPost={(id) => setModal({ type: 'thread', id })}
+                  onOpenNotice={(item) => setModal({ type: 'notice', item })}
+                />
+              )}
+              {['discussions', 'saved', 'announcements'].includes(
                 page,
               ) && (
-                <div className="content-grid">
+                <div className="forum-content">
                   <section className="primary-content">
-                    {page === 'feed' && (
-                      <>
-                        <div className="welcome-heading">
-                          <span className="eyebrow">
-                            {new Date()
-                              .toLocaleDateString('en-IN', {
-                                weekday: 'long',
-                                day: 'numeric',
-                                month: 'long',
-                                timeZone: 'Asia/Kolkata',
-                              })
-                              .toUpperCase()}
-                          </span>
-                          <h1>Campus feed</h1>
-                          <p>Recent posts from students.</p>
-                        </div>
-                        <button
-                          className="composer"
-                          onClick={() => setModal({ type: 'post' })}
-                        >
-                          <Avatar name={user.name} />
-                          <span>Write a post or ask a question</span>
-                          <span className="composer-plus">
-                            <Icon name="plus" />
-                          </span>
-                        </button>
-                      </>
-                    )}
                     {page === 'discussions' && (
                       <>
                         <div className="page-heading">
@@ -690,12 +665,12 @@ export default function App() {
                                 className="button outline"
                                 onClick={() =>
                                   page === 'saved'
-                                    ? navigate('feed')
+                                    ? navigate('discussions')
                                     : setModal({ type: 'post' })
                                 }
                               >
                                 {page === 'saved'
-                                  ? 'Explore the feed'
+                                  ? 'Browse discussions'
                                   : 'New post'}
                                 <Icon name="arrow" size={16} />
                               </button>
@@ -705,78 +680,6 @@ export default function App() {
                       </div>
                     )}
                   </section>
-                  <aside className="right-rail">
-                    <div className="rail-heading">
-                      <Icon name="pin" size={18} />
-                      <h2>Latest announcements</h2>
-                      <button
-                        aria-label="View all announcements"
-                        onClick={() => navigate('announcements')}
-                      >
-                        <Icon name="arrow" size={17} />
-                      </button>
-                    </div>
-                    <div className="noticeboard">
-                      {announcements.slice(0, 2).map((a, i) => (
-                        <button
-                          key={a.id}
-                          className={'notice ' + (i === 0 ? 'cream' : 'white')}
-                          onClick={() => setModal({ type: 'notice', item: a })}
-                        >
-                          <div>
-                            <span className="eyebrow">
-                              {a.category?.toUpperCase() || 'CAMPUS'} UPDATE
-                            </span>
-                            {a.is_pinned && <Icon name="pin" size={15} />}
-                          </div>
-                          <h3>{a.title}</h3>
-                          <p>{a.content}</p>
-                          <div className="notice-bottom">
-                            <small>{date(a.created_at)}</small>
-                            <Icon name="arrow" size={17} />
-                          </div>
-                        </button>
-                      ))}
-                      {!announcements.length && (
-                        <p className="muted">
-                          New campus updates will appear here.
-                        </p>
-                      )}
-                    </div>
-                    <div className="rail-heading schedule-rail-heading">
-                      <Icon name="calendar" size={18} />
-                      <h2>
-                        {todayName() === 'Sunday' || todayName() === 'Saturday'
-                          ? 'Next up: Monday'
-                          : 'Your day ahead'}
-                      </h2>
-                      <span>{user.branch}</span>
-                    </div>
-                    <div className="day-ahead">
-                      <div className="day-ahead-top">
-                        <span>{initialDay()}</span>
-                        <small>SEM {user.semester}</small>
-                      </div>
-                      {upcoming.slice(0, 3).map((c, i) => (
-                        <div className="mini-class" key={i}>
-                          <span className="timeline-dot" />
-                          <small>{c.time}</small>
-                          <strong>{c.subject.replace(/\s*\(.*\)/, '')}</strong>
-                          <span>{c.room}</span>
-                        </div>
-                      ))}
-                      {!upcoming.length && (
-                        <p className="muted">No classes on this schedule.</p>
-                      )}
-                      <button
-                        className="rail-link"
-                        onClick={() => navigate('timetable')}
-                      >
-                        Open full timetable
-                        <Icon name="arrow" size={17} />
-                      </button>
-                    </div>
-                  </aside>
                 </div>
               )}
               {page === 'timetable' && (

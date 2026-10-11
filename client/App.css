@@ -625,10 +625,6 @@ label input, label select, label textarea {
   margin-top: 4px;
 }
 
-.sidebar-user > svg {
-  color: var(--muted);
-}
-
 .signout {
   display: flex;
   align-items: center;
@@ -714,7 +710,7 @@ label input, label select, label textarea {
   white-space: nowrap;
 }
 
-.search-box button, .top-avatar {
+.search-box button {
   padding: 0;
 }
 
@@ -1007,7 +1003,126 @@ label input, label select, label textarea {
   color: var(--error);
 }
 
-/* Campus sidebar */
+/* Campus overview */
+.forum-content {
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.overview-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.overview-summary > section {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.overview-update-card, .overview-summary .day-ahead {
+  flex: 1;
+}
+
+.overview-update-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.overview-update-card .notice {
+  border: 0;
+  border-radius: 0;
+  padding: 24px;
+  flex: 1;
+}
+
+.overview-update-card .notice h3 {
+  font-size: 26px;
+}
+
+.overview-update-card .notice p {
+  font-size: 14px;
+}
+
+.overview-next-update {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding: 18px 24px;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.overview-next-update svg, .recent-post > svg {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+
+.overview-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.recent-post-list {
+  margin-top: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.recent-post {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 22px 24px;
+  text-align: left;
+}
+
+.recent-post + .recent-post {
+  border-top: 1px solid var(--line);
+}
+
+.recent-post:hover, .overview-next-update:hover {
+  background: var(--surface-muted);
+}
+
+.recent-post > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-post-meta {
+  display: flex;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.recent-post h3 {
+  font-size: 16px;
+  line-height: 1.5;
+  margin-top: 7px;
+}
+
+.recent-post p {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 7px;
+}
+
 .right-rail {
   padding-top: 6px;
 }
@@ -2169,6 +2284,24 @@ label input, label select, label textarea {
 }
 
 @media (max-width: 760px) {
+  .overview-summary {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .overview-update-card .notice h3 {
+    font-size: 23px;
+  }
+  .overview-conversations .feed-title-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .recent-post {
+    padding: 18px 16px;
+    gap: 12px;
+  }
+  .recent-post h3 {
+    font-size: 14px;
+  }
   .sidebar {
     left: 0;
     width: 245px;
@@ -2592,9 +2725,6 @@ label input, label select, label textarea {
 }
 
 @media (max-width: 420px) {
-  .top-avatar {
-    display: none;
-  }
   .search-box {
     width: 128px;
   }
