@@ -20,7 +20,7 @@ DATA_PATH = Path(os.environ.get("NSUT_DATA_PATH", str(ROOT / "runtime" / "data.j
 LOCK = threading.RLock()
 SESSIONS = {}
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
-ALLOW_DEMO = os.environ.get("ALLOW_DEMO", "true").lower() == "true"
+ALLOW_DEMO = os.environ.get("ALLOW_DEMO", "false").lower() == "true"
 ADMIN_EMAILS = {s.strip().lower() for s in os.environ.get("ADMIN_EMAILS", "").split(",") if s.strip()}
 data = {"users": copy.deepcopy(store.USERS), "posts": copy.deepcopy(store.POSTS), "announcements": copy.deepcopy(store.ANNOUNCEMENTS), "timetables": copy.deepcopy(store.TIMETABLES)}
 for user in data["users"]:

@@ -2,23 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 import Icon from '../icons'
 import ThemeButton from '../ThemeButton'
 import { Brand, CampusDrawing } from '../components'
-import { api, isHostedDemo } from '../api'
+import { api } from '../api'
 
 export default function Login({ onLogin, config, theme, onToggleTheme }) {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
   const google = useRef(null)
-  async function enter(email) {
-    setBusy(email)
-    setError('')
-    try {
-      onLogin(await api('/auth/demo', 'POST', { email }))
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setBusy('')
-    }
-  }
   useEffect(() => {
     if (!config.google_client_id) return
     let active = true
@@ -30,11 +19,17 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
       window.google.accounts.id.initialize({
         client_id: config.google_client_id,
         hd: 'nsut.ac.in',
+        ...(config.nonce ? { nonce: config.nonce } : {}),
+        auto_select: false,
         callback: async ({ credential }) => {
+          setBusy('google')
+          setError('')
           try {
             onLogin(await api('/auth/google', 'POST', { credential }))
           } catch (e) {
             setError(e.message)
+          } finally {
+            setBusy('')
           }
         },
       })
@@ -44,12 +39,13 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
         width: 320,
       })
     }
+    script.onerror = () => setError('Google sign-in could not load. Check your connection and try again.')
     document.head.appendChild(script)
     return () => {
       active = false
       script.remove()
     }
-  }, [config.google_client_id, onLogin])
+  }, [config.google_client_id, config.nonce])
   return (
     <div className="login">
       <div className="login-theme">
@@ -75,9 +71,7 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
         <div className="login-welcome">
           <h2>Sign in</h2>
           <p>
-            {config.demo
-              ? 'Choose a demo account below.'
-              : 'Use your @nsut.ac.in Google account.'}
+            Use your @nsut.ac.in Google account.
           </p>
           {config.google_client_id ? (
             <div ref={google} className="google-signin" />
@@ -86,50 +80,19 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
               <Icon name="shield" />
               <span>
                 Campus accounts use <strong>@nsut.ac.in</strong>.<br />
-                <small>Google sign-in is not configured for this demo.</small>
+                <small>Google sign-in is loading. Please refresh if this stays here.</small>
               </span>
             </div>
           )}
-          {config.demo && (
-            <>
-              <div className="divider">
-                <span>Demo accounts</span>
-              </div>
-              <button
-                className="button primary full"
-                disabled={!!busy}
-                onClick={() => enter('student@nsut.ac.in')}
-              >
-                {busy === 'student@nsut.ac.in' ? 'Signing in…' : 'Student demo'}
-                <Icon name="arrow" />
-              </button>
-              <button
-                className="button outline full"
-                disabled={!!busy}
-                onClick={() => enter('admin@nsut.ac.in')}
-              >
-                {busy === 'admin@nsut.ac.in' ? 'Signing in…' : 'Admin demo'}
-                <Icon name="shield" />
-              </button>
-            </>
-          )}
+          {busy === 'google' && <p role="status">Signing in…</p>}
           {error && (
             <p className="form-error" role="alert">
               {error}
             </p>
           )}
-          {config.demo && (
-            <p className="demo-note">
-              Demo accounts use sample data.
-              <br />
-              {isHostedDemo
-                ? 'Your demo changes are saved in this browser.'
-                : 'Your demo changes are saved on the local server.'}
-            </p>
-          )}
           <div className="login-foot">
             <span>NSUT Connect</span>
-            <span>Demo</span>
+            <span>Campus accounts</span>
           </div>
         </div>
       </section>

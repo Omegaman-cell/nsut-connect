@@ -1,79 +1,59 @@
 # NSUT Connect
 
-A complete campus community prototype, built from the React/FastAPI starter in your Scans folder. The interface uses neutral surfaces, one restrained green accent, direct labels, a responsive layout and persistent light/dark mode.
+A campus community project with Google sign-in for verified `@nsut.ac.in` accounts, discussions, announcements, timetables and light/dark mode.
 
-![NSUT Connect campus feed](docs/preview.png)
+Live app: https://nsut-connect-campus-yash.aizensosukeew345.chatgpt.site
+Source: https://github.com/Omegaman-cell/nsut-connect
 
-## Run locally
+![NSUT Connect](docs/preview.png)
 
-On this Windows computer, right-click **start.ps1** and choose **Run with PowerShell**, or run:
+## Public app
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\start.ps1
-```
+The deployed app uses a React UI, a Cloudflare Worker API and a D1 SQLite database through Sites hosting. Google Identity Services supplies the sign-in button. The server uses `jose` to verify Google's signature, issuer, audience, expiry, a one-use login nonce, verified email and `nsut.ac.in` hosted domain. There is no public demo login or password login.
 
-The launcher reuses installed dependencies, installs missing dependencies if necessary, and opens http://localhost:5173. It starts the backend and frontend as hidden processes and writes logs to `work/`. Run `stop.ps1` to stop processes started by the launcher. Existing services on the two app ports are reused only if they identify as NSUT Connect.
+Sessions last 24 hours. The browser receives a Secure, HttpOnly, SameSite=Strict cookie; only its hash is stored in the database. Browser storage holds display state/preferences and offline snapshots, not an authentication credential. The server checks every protected request. Profile names come from Google on first sign-in and can then be edited.
 
-For a different computer, install Node.js 22+ and Python 3.11+, then use two terminals:
+Administrator emails are set with the server environment variable `ADMIN_EMAILS`, a comma-separated list of approved `@nsut.ac.in` accounts. Without an allowlist, every signed-in user is a student. The frontend cannot grant admin access. Changing the allowlist takes effect on subsequent server requests after the updated environment is deployed.
 
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
-```
+The initial notices and discussions are sample data. New posts, replies, likes, bookmarks and profile edits are shared through the database. Timetables are transcribed from the supplied July–December 2026 PDF: CSE (1, 7), CSAI (1, 7), CSDS (1, 5, 7), MAC (1, 5, 7). Section and elective alternatives are preserved; linked schedules not present in the PDF are not invented.
+
+## Run the production server locally
+
+Install Node.js 22.13+ and pnpm 11.25.0. In `hosted/`:
 
 ```powershell
-cd frontend
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run build
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_natural_fenris.sql
+pnpm start -- --port 5173 --var GOOGLE_CLIENT_ID:YOUR_CLIENT_ID.apps.googleusercontent.com
 ```
 
-API documentation: http://127.0.0.1:8000/docs.
+Apply that migration only once to a fresh local database. Local D1 data is separate from the public database. Register `http://localhost` and `http://localhost:5173` as JavaScript origins in your Google OAuth web client, then visit http://localhost:5173. A client secret is not used by this sign-in flow.
 
-## What works
+`frontend/src/` is the editable UI. `hosted/scripts/sync-client.mjs` copies it and the timetable seed into `hosted/` before builds. The hosted folder can also be deployed on its own using that prepared client copy. Sites provisions D1 and applies the tracked migrations during deployment; do not add database creation to request handlers.
 
-- Student and admin demo sign-in, session restore, sign-out, and API role checks.
-- Feed with category filters, full-text search, latest/most-liked sorting, likes, bookmarks, creating posts, and threaded replies.
-- Dedicated discussion topics, saved collection, and complete announcement details.
-- Admin announcement creation, editing, pinning, removal, and post moderation.
-- Profile editing with available branch/semester choices.
-- All supplied timetable data: CSE (1, 7), CSAI (1, 7), CSDS (1, 5, 7), MAC (1, 5, 7). PDF-derived July–December 2026 schedules, CSE/CSAI section selection, day/week views and CSV download.
-- Notification inbox with unread indicators and mark-as-read.
-- Light/dark mode with a saved choice and device-preference default.
-- Mobile navigation, accessible form labels, keyboard focus, modal focus trap, Escape to close, and Ctrl/Cmd+K search.
-- Installable web manifest and service worker for the production build. After visiting the production app, cached timetable content can be viewed offline. This is a responsive web app/PWA, not a native Android or iOS binary.
+## Original Python backend
 
-## Data and authentication
+The React/FastAPI starter is retained under `frontend/` and `backend/`. `start.ps1` and `stop.ps1` run/stop this version on Windows. Before starting it, set `GOOGLE_CLIENT_ID` and optionally `ADMIN_EMAILS` in the launcher terminal. It stores edits in `backend/runtime/data.json` and uses expiring bearer sessions. Demo access defaults to disabled and is enabled explicitly only by isolated tests. The public app uses the Worker backend because Sites runs Workers rather than Python.
 
-The local app reads sample data from `backend/store.py`, serves it through real API endpoints, and persists edits to `backend/runtime/data.json`. No database is required. Stop the server before resetting that runtime file to return to the seed data. Local sessions last 24 hours and are cleared when the backend restarts. Changing a profile does not rewrite historical post authors.
+## Features
 
-When deployed as a static frontend, the app supports the **frontend submission track**: it uses the same sample dataset through a browser-local API adapter. Its data is stored in that browser and is not shared between devices. A static deployment does not host Python or provide production campus authentication. Running the app locally provides the full FastAPI implementation.
+- Campus Google sign-in, session restore and sign-out.
+- Feed, discussion topics, category/search filters, sorting, posts, replies, likes and saved posts.
+- Announcements and administrator create/edit/pin/delete controls; post ownership/moderation checks.
+- Editable profiles, branch/semester/section selection, timetable day/week views and CSV export.
+- Notifications with read indicators; responsive navigation; keyboard focus and modal controls.
+- Persistent light/dark mode. Installable web manifest and cached public app shell; a signed-in visitor can view the saved timetable snapshot offline. This is a web app, not a native mobile binary.
 
-Demo accounts: `student@nsut.ac.in` and `admin@nsut.ac.in`. No passwords are needed for these clearly labelled demo roles. Notices are sample data. Timetables are transcribed from the supplied July–December 2026 PDF; unlisted details and elective alternatives are labelled explicitly.
-
-### Enable actual Google sign-in in the local app
-
-Create a Google OAuth web client with `http://localhost:5173` as an authorized JavaScript origin. Set these environment variables in the backend terminal before starting the server:
+## Checks
 
 ```powershell
-$env:GOOGLE_CLIENT_ID = 'your-client-id.apps.googleusercontent.com'
-$env:ADMIN_EMAILS = 'authorized-admin@nsut.ac.in'
-$env:ALLOW_DEMO = 'false'
+cd hosted
+pnpm test
+node node_modules/typescript/bin/tsc --noEmit
+pnpm run build
 ```
 
-The UI renders Google's sign-in button when configured. The server verifies Google's ID token, audience, verified email, `nsut.ac.in` hosted domain and email suffix. Admin roles come only from the server-configured email allowlist. Keep demo sign-in disabled when using actual campus accounts. No OAuth secrets or credentials are included in this project.
+Eleven Worker tests cover Google token validation, campus/role restrictions, CSRF origins, session expiry/logout, SQL-backed posts/replies/likes/saves, ownership, admin announcements and timetable/profile validation. `backend/test_api.py` provides four isolated tests for the retained Python API. Successful campus sign-in still needs a real campus account; test fixtures do not bypass live authentication.
 
-## Validation
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m pip install httpx
-.\.venv\Scripts\python.exe -m unittest test_api -v
-```
-
-Four API integration tests cover authentication/authorization boundaries, post/reply/like/save persistence, admin CRUD, profile validation and timetable grouping. Each test uses isolated temporary data. The React production build also passes with `npm run build`. Real Google sign-in requires your own client configuration and was not tested with a campus account.
-
-## Project structure
-
-Start with [CODE_GUIDE.md](CODE_GUIDE.md) for the reading order and an interaction walkthrough. [DEPENDENCIES.md](DEPENDENCIES.md) lists the complete stack, direct package versions, development tools and all frontend transitive dependencies.
+Read [CODE_GUIDE.md](CODE_GUIDE.md) for the code walkthrough and [DEPENDENCIES.md](DEPENDENCIES.md) for the full technology/package inventory.

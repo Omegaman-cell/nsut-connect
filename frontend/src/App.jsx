@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { api, session, storeSession, isHostedDemo } from './api'
+import { api, session, storeSession } from './api'
 import Icon from './icons'
 import { selectedSection } from './timetable'
 import {
@@ -29,7 +29,7 @@ import { initialTheme } from './theme'
 export default function App() {
   const [theme, setTheme] = useState(initialTheme)
   const [auth, setAuth] = useState(session)
-  const [config, setConfig] = useState({ google_client_id: '', demo: true })
+  const [config, setConfig] = useState({ google_client_id: '', demo: false })
   const [page, setPage] = useState(location.hash.slice(1) || 'feed')
   const [posts, setPosts] = useState([])
   const [announcements, setAnnouncements] = useState([])
@@ -374,7 +374,7 @@ export default function App() {
           </button>
           <button className="signout" onClick={logout}>
             <Icon name="logout" size={15} />
-            Sign out<span>{isHostedDemo ? 'BROWSER DEMO' : 'LOCAL API'}</span>
+            Sign out<span>CAMPUS ACCOUNT</span>
           </button>
         </div>
       </aside>
@@ -912,7 +912,7 @@ export default function App() {
         </main>
         <footer className="app-footer">
           <span>NSUT Connect</span>
-          <span>Student project · Demo</span>
+          <span>Student project</span>
           <button onClick={() => setModal({ type: 'about' })}>About</button>
         </footer>
       </div>
@@ -1027,9 +1027,7 @@ export default function App() {
             </p>
             <h3>Demo data</h3>
             <p>
-              {isHostedDemo
-                ? 'This online version runs with sample data saved in your browser. Open it on the same device to find your changes.'
-                : 'This local version uses the FastAPI server and saves sample data to a JSON file.'}{' '}
+              Discussions and notices start with sample data. New posts and replies are saved on the server.{' '}
               Timetables are transcribed from the supplied July–December 2026
               PDF. Notices and discussions are sample data.
             </p>
@@ -1039,8 +1037,8 @@ export default function App() {
               can manage announcements and remove posts.
             </p>
             <p className="form-note">
-              Demo accounts are for exploring roles. Google sign-in is available
-              in the local app when an administrator configures it.
+              Sign-in requires a verified @nsut.ac.in Google account.
+              Administrators are assigned on the server.
             </p>
           </div>
         </Modal>

@@ -4,6 +4,12 @@ dist/
 __pycache__/
 runtime/
 .env
+.env.*
+.dev.vars
+.wrangler/
+.vinext/
+.next/
+*.tsbuildinfo
 .openai/
 work/
 .sites-*/

@@ -8,6 +8,7 @@ from pathlib import Path
 temporary = tempfile.TemporaryDirectory()
 os.environ["NSUT_DATA_PATH"] = str(Path(temporary.name) / "data.json")
 os.environ["GOOGLE_CLIENT_ID"] = ""
+os.environ["ALLOW_DEMO"] = "true"  # Explicitly enabled only for isolated tests.
 from fastapi.testclient import TestClient
 import main
 baseline = copy.deepcopy(main.data)

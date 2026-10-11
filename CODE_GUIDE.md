@@ -1,12 +1,12 @@
 # How to understand NSUT Connect
 
-This is ordinary React with function components, hooks, props and plain CSS. The backend is a single FastAPI module with simple functions and JSON data. The first version was too compressed; it is now formatted and the reusable components and three screens have their own files. There are no custom hooks or state-management frameworks to learn.
+This is ordinary React with function components, hooks, props and plain CSS. The public backend is a small JavaScript API using SQL. The original FastAPI backend is retained for local Python development. The first version was too compressed; it is now formatted and the reusable components and three screens have their own files. There are no custom hooks or state-management frameworks to learn.
 
 ## Read in this order
 
 1. `frontend/src/main.jsx`: mounts React into the HTML page and registers the production service worker.
 2. `frontend/src/pages/Login.jsx`: a small screen. `useState` stores loading/errors, a button calls `api`, and `onLogin` passes the session back to App.
-3. `frontend/src/api.js`: sends `/api` requests to FastAPI on localhost. On the hosted demo it changes a browser-local dataset instead. Both return the same objects so the UI works in either mode.
+3. `frontend/src/api.js`: sends every request to `/api`. The public server uses an HttpOnly session cookie; the retained Python server uses a bearer token. It never edits a browser-local demo dataset.
 4. `frontend/src/App.jsx`: owns login state, posts, notices, timetable data, filters and the current page. `load` fetches data. Named action functions call the API and update state. JSX below them renders the selected page.
 5. `frontend/src/components.jsx`: repeated UI pieces such as Avatar, Modal, PostCard, Compose and Thread. Each receives its data and callbacks as props.
 6. `frontend/src/pages/Timetable.jsx` and `Profile.jsx`: their forms and display. `timetable.js` remembers your section; `helpers.js` handles small formatting tasks.
@@ -16,7 +16,7 @@ This is ordinary React with function components, hooks, props and plain CSS. The
 
 ## Trace one interaction
 
-Click a post's heart → PostCard calls its `onLike` prop → App's `like` function calls `api('/posts/ID/like', 'POST')` → FastAPI or the browser adapter toggles that user's like → App replaces the updated post in state → React redraws the count.
+Click a post's heart → PostCard calls its `onLike` prop → App's `like` function calls `api('/posts/ID/like', 'POST')` → the server toggles that user's like → App replaces the updated post in state → React redraws the count.
 
 ## Useful JavaScript syntax
 
@@ -33,19 +33,23 @@ Click a post's heart → PostCard calls its `onLike` prop → App's `like` funct
 
 ## Names and login
 
-The demo accounts are **Student** (`student@nsut.ac.in`) and **Admin** (`admin@nsut.ac.in`). There is no hardcoded project-owner name. A configured real Google login reads the Google account name, falling back to the email's local part. Profile edits remain under the user's control. Old default demo names are migrated without deleting posts or bookmarks.
+Google provides the account name on first sign-in; the email's local part is the fallback. Profile editing remains under the user's control. There are no public sample accounts.
 
-The public site has demo sign-in and sign-out. It remembers a session, so returning visitors go straight to the feed; use **Sign out** to see the entry screen. It does not host the Python backend. Real Google authentication requires the local/server backend and your own OAuth client configuration. Browser demo roles are illustrative, not a security boundary.
+The public UI receives a cookie session marker for display state, while the actual session cookie is HttpOnly and inaccessible to JavaScript. Every API request checks the session in D1. Changing localStorage or a role in the browser cannot authenticate or grant admin access.
+
+Read `hosted/server/auth.js` next: `verifyGoogle` validates the JWT with Google's public keys and checks the campus domain. `roleFor` reads the server admin allowlist. Then read `hosted/server/api.js`: it maps URL/method pairs to ordinary async functions and SQL statements. `db/schema.ts` declares the tables; `drizzle/` contains the generated schema migration. `app/api/[...path]/route.ts` connects HTTP requests to that API. `app/campus-app.tsx` loads the browser UI after hydration.
+
+`hosted/tests/auth.test.mjs` generates temporary signing keys to exercise valid and invalid tokens. Those keys are not used by the live server. `api.test.mjs` runs the API against SQLite with a tiny D1 adapter, including ownership and session checks.
 
 ## Timetable source and limitations
 
 Schedules come from the supplied **Time Table BTech CSE (July-Dec 2026).pdf**. First-year CSE and CSAI have separate section choices. Merged cells retain their actual duration; tutorial-group labels and elective alternatives are preserved. Missing instructors/rooms are marked **Not listed in PDF**, and undefined slots remain labelled **Unassigned slot**. Seventh-semester tables contain all slots, including multiple section/elective alternatives; they are not a personalised course registration. The PDF only links out to CSE/CSAI fifth-semester and third-semester schedules, so those linked schedules have not been invented or imported.
 
-Reference timetable updates replace stale schedules in an existing browser/server dataset while keeping user changes. Local backend edits live in `backend/runtime/data.json`; browser demo edits live in `localStorage`. Neither is a database shared across internet visitors.
+The public server reads the reference timetables from `hosted/server/seed.json`. Public user edits live in D1; the retained Python backend stores local edits in `backend/runtime/data.json`. Offline timetable snapshots and preferences use browser storage.
 
 ## Make a small change
 
-Change a heading in App, a colour in App.css, or one timetable row in timetable.json. For timetable edits, keep `frontend/public/seed.json`'s timetables in sync and increment the browser adapter's timetable version for deployed data refreshes. Run `npm run build` in frontend. For backend logic changes, run `python -m unittest test_api -v` in backend.
+Change a heading in App, a colour in App.css, or one timetable row in timetable.json. For timetable edits, keep `frontend/public/seed.json`'s timetables in sync with `backend/timetable.json`. Run `pnpm run build` in hosted to copy the UI/seed and build the full app. Run `pnpm test` for Worker changes or `python -m unittest test_api -v` in backend for Python changes.
 
 For every dependency and the tools used during development, see **DEPENDENCIES.md**.
 
