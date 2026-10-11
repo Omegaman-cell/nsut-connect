@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import Icon from '../icons'
-import { Avatar, Brand, CampusDrawing, Empty } from '../components'
+import { Empty } from '../components'
 import { days, initialDay } from '../helpers'
 import { sectionKey, selectedSection, sectionsFor } from '../timetable'
 
@@ -57,9 +57,8 @@ export default function Timetable({ tables, user, notify }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">A LITTLE STRUCTURE GOES A LONG WAY</span>
-          <h1>Your week, at a glance.</h1>
-          <p>Make room for the things between classes.</p>
+          <h1>Timetable</h1>
+          <p>July–December 2026</p>
         </div>
         <button
           className="button outline"
@@ -195,8 +194,8 @@ export default function Timetable({ tables, user, notify }) {
               {!schedule.some((c) => c.day === day) && (
                 <Empty
                   icon="sun"
-                  title="A little breathing room."
-                  description="No classes scheduled for this day. Use it well."
+                  title="No classes"
+                  description="Nothing scheduled for this day."
                 />
               )}
             </div>

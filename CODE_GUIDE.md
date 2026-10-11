@@ -48,3 +48,7 @@ Reference timetable updates replace stale schedules in an existing browser/serve
 Change a heading in App, a colour in App.css, or one timetable row in timetable.json. For timetable edits, keep `frontend/public/seed.json`'s timetables in sync and increment the browser adapter's timetable version for deployed data refreshes. Run `npm run build` in frontend. For backend logic changes, run `python -m unittest test_api -v` in backend.
 
 For every dependency and the tools used during development, see **DEPENDENCIES.md**.
+
+## Light and dark mode
+
+`theme.js` reads the saved theme or device preference. App stores it in one state variable; an effect writes `data-theme` to the HTML element and saves the choice. `ThemeButton.jsx` toggles it. App.css defines the same semantic colour variables for both themes. A small script in index.html applies the choice before React mounts. No theme library is required.

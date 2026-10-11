@@ -5,7 +5,7 @@
 - JavaScript (ES modules), JSX, HTML, CSS, SVG, JSON; Python; PowerShell launch/stop scripts.
 - React function components with useState, useEffect and useRef. Hash navigation using the browser URL.
 - Custom CSS, SVG icons/campus drawing, letter-based avatars. Google Fonts: DM Sans and Manrope; Georgia/Segoe UI/system fallbacks.
-- Browser APIs: fetch, localStorage, structuredClone, URL/hash/history events, Intl/Date formatting, Blob/Object URLs for CSV, DOM events/focus, timers, online/offline status, service worker and Cache API, web app manifest.
+- Browser APIs: fetch, localStorage, structuredClone, URL/hash/history events, Intl/Date formatting, Blob/Object URLs for CSV, DOM events/focus, timers, online/offline status, matchMedia/device theme preference, service worker and Cache API, web app manifest.
 - Storage: JSON file for local server edits; browser localStorage for public demo data/session/read markers/section choice/offline content; Cache API for offline assets.
 - Authentication: local random bearer sessions with expiry; optional Google Identity Services in the UI and Google tokeninfo verification in Python; server administrator email allowlist.
 - Hosting: OpenAI Sites static hosting (production infrastructure managed by Sites); GitHub public source repository; Git for source/version control.
@@ -43,7 +43,7 @@ Type definition packages do not mean the app uses TypeScript; application source
 - Prettier 3.6.2 was downloaded temporarily to format source. It is not an app dependency and is not required to run the project.
 - pdfplumber and its PDF renderer were used temporarily to read/render the supplied timetable. They are not app runtime dependencies.
 - Git and Git Credential Manager were used to push to the owner-authorized GitHub repository; Sites source helpers packaged and deployed the static build.
-- No Claude/Opus model, Claude assets, or Opus-designed website was used. Icons and campus artwork are inline SVG.
+- No Claude/Opus model or Claude assets were used. The final design revision was informed by Linear’s designer-authored UI refresh, GitHub Discussions and a published article showing AI-built websites; no source or visual assets were copied. Icons and campus artwork are inline SVG.
 
 ## Complete frontend transitive lockfile inventory
 

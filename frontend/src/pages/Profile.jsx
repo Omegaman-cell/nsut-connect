@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import Icon from '../icons'
-import { Avatar, Brand, CampusDrawing, Empty } from '../components'
-import { days, initialDay } from '../helpers'
+import { Avatar } from '../components'
 
 export default function Profile({ user, tables, posts, onSave, notify }) {
   const [editing, setEditing] = useState(false)
@@ -17,7 +16,7 @@ export default function Profile({ user, tables, posts, onSave, notify }) {
     try {
       await onSave({ name: name.trim(), bio: bio.trim(), branch, semester })
       setEditing(false)
-      notify('Profile updated. Make yourself at home.')
+      notify('Profile updated.')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -28,16 +27,12 @@ export default function Profile({ user, tables, posts, onSave, notify }) {
     <>
       <div className="page-heading">
         <div>
-          <span className="eyebrow">YOUR CORNER OF CAMPUS</span>
-          <h1>A familiar face.</h1>
-          <p>The person behind the conversations.</p>
+          <h1>My profile</h1>
+          <p>Your account details.</p>
         </div>
       </div>
       <section className="profile-panel">
-        <div className="profile-cover">
-          <CampusDrawing />
-          <span>YOU BELONG HERE.</span>
-        </div>
+        <div className="profile-cover" />
         <div className="profile-intro">
           <Avatar name={user.name} large />
           <button
@@ -54,7 +49,7 @@ export default function Profile({ user, tables, posts, onSave, notify }) {
           </span>
           <h2>{user.name}</h2>
           <p className="muted">{user.email}</p>
-          <p>{user.bio || 'Tell your campus a little about yourself.'}</p>
+          <p>{user.bio || 'No bio added.'}</p>
           <div className="profile-meta">
             <span>
               <Icon name="book" size={17} />
@@ -70,7 +65,7 @@ export default function Profile({ user, tables, posts, onSave, notify }) {
               <strong>
                 {posts.filter((p) => p.author_email === user.email).length}
               </strong>
-              <span>Conversations</span>
+              <span>Posts</span>
             </div>
             <div>
               <strong>{user.saved?.length || 0}</strong>
@@ -102,7 +97,7 @@ export default function Profile({ user, tables, posts, onSave, notify }) {
                 />
               </label>
               <label>
-                A little about you
+                Bio
                 <textarea
                   rows={3}
                   maxLength={280}

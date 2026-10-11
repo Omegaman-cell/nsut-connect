@@ -141,7 +141,7 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
           ? initial
             ? 'Edit announcement'
             : 'Post an announcement'
-          : 'Start a conversation'
+          : 'New post'
       }
       onClose={onClose}
     >
@@ -152,8 +152,8 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
             <strong>{user.name}</strong>
             <small>
               {announcement
-                ? 'Posting to the campus noticeboard'
-                : 'Sharing with the NSUT community'}
+                ? 'Posting an announcement'
+                : 'Posting as a student'}
             </small>
           </div>
         </div>
@@ -177,9 +177,7 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder={
-              announcement
-                ? 'Give your update a clear title'
-                : 'What’s on your mind?'
+              announcement ? 'Give your update a clear title' : 'Post title'
             }
           />
         </label>
@@ -192,7 +190,7 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
             rows={6}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Share the details. A question, an idea, an invitation…"
+            placeholder="Write your message"
           />
         </label>
         {announcement && (
@@ -205,9 +203,7 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
             Pin this update to the top
           </label>
         )}
-        <div className="form-note">
-          Keep it kind. Keep it useful. You’re among peers.
-        </div>
+        <div className="form-note">Do not share private contact details.</div>
         {error && (
           <p className="form-error" role="alert">
             {error}
@@ -224,7 +220,7 @@ export function Compose({ user, announcement, initial, onSubmit, onClose }) {
                 ? 'Save changes'
                 : announcement
                   ? 'Publish update'
-                  : 'Post conversation'}
+                  : 'Publish post'}
             <Icon name="arrow" size={17} />
           </button>
         </div>
@@ -336,7 +332,7 @@ export function Thread({ post, user, onClose, onReply }) {
     }
   }
   return (
-    <Modal title="The conversation" wide onClose={onClose}>
+    <Modal title="Post and replies" wide onClose={onClose}>
       <div className="thread">
         <span className={'tag ' + categoryClass(post.category)}>
           {post.category}
@@ -352,11 +348,7 @@ export function Thread({ post, user, onClose, onReply }) {
         <p className="thread-content">{post.content}</p>
         <div className="thread-replies">
           <h3>{post.comments?.length || 0} replies</h3>
-          {!post.comments?.length && (
-            <p className="muted">
-              A good conversation starts with one reply. Add yours.
-            </p>
-          )}
+          {!post.comments?.length && <p className="muted">No replies yet.</p>}
           {post.comments?.map((c) => (
             <div className="comment" key={c.id}>
               <Avatar name={c.author} />
@@ -378,7 +370,7 @@ export function Thread({ post, user, onClose, onReply }) {
               maxLength={2000}
               value={reply}
               onChange={(e) => setReply(e.target.value)}
-              placeholder="Add something to the conversation…"
+              placeholder="Write a reply"
             />
           </label>
           {error && (

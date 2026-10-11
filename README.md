@@ -1,6 +1,6 @@
 # NSUT Connect
 
-A complete campus community prototype, built from the React/FastAPI starter in your Scans folder. The interface takes its cues from a campus commons and noticeboard: warm paper, forest green, editorial typography, custom campus line art, and a responsive three-column layout.
+A complete campus community prototype, built from the React/FastAPI starter in your Scans folder. The interface uses neutral surfaces, one restrained green accent, direct labels, a responsive layout and persistent light/dark mode.
 
 ![NSUT Connect campus feed](docs/preview.png)
 
@@ -40,6 +40,7 @@ API documentation: http://127.0.0.1:8000/docs.
 - Profile editing with available branch/semester choices.
 - All supplied timetable data: CSE (1, 7), CSAI (1, 7), CSDS (1, 5, 7), MAC (1, 5, 7). PDF-derived July–December 2026 schedules, CSE/CSAI section selection, day/week views and CSV download.
 - Notification inbox with unread indicators and mark-as-read.
+- Light/dark mode with a saved choice and device-preference default.
 - Mobile navigation, accessible form labels, keyboard focus, modal focus trap, Escape to close, and Ctrl/Cmd+K search.
 - Installable web manifest and service worker for the production build. After visiting the production app, cached timetable content can be viewed offline. This is a responsive web app/PWA, not a native Android or iOS binary.
 

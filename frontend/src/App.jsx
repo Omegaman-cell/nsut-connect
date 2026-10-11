@@ -13,7 +13,6 @@ import {
 import {
   Avatar,
   Brand,
-  CampusDrawing,
   Modal,
   Compose,
   PostCard,
@@ -23,9 +22,12 @@ import {
 import Login from './pages/Login'
 import Timetable from './pages/Timetable'
 import Profile from './pages/Profile'
+import ThemeButton from './ThemeButton'
+import { initialTheme } from './theme'
 
 // App owns the shared data and passes it to the screens through props.
 export default function App() {
+  const [theme, setTheme] = useState(initialTheme)
   const [auth, setAuth] = useState(session)
   const [config, setConfig] = useState({ google_client_id: '', demo: true })
   const [page, setPage] = useState(location.hash.slice(1) || 'feed')
@@ -51,6 +53,16 @@ export default function App() {
   const search = useRef(null)
   const toastTimer = useRef(null)
   const user = auth?.user
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('nsut-theme', theme)
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#17191c' : '#f6f7f8')
+  }, [theme])
+  function toggleTheme() {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
   function notify(message) {
     setToast(message)
     clearTimeout(toastTimer.current)
@@ -184,9 +196,7 @@ export default function App() {
       const u = await api(`/posts/${postId}/save`, 'POST')
       updateUser(u)
       notify(
-        u.saved.includes(postId)
-          ? 'Saved to your collection.'
-          : 'Removed from saved posts.',
+        u.saved.includes(postId) ? 'Post saved.' : 'Removed from saved posts.',
       )
     } catch (err) {
       notify(err.message)
@@ -209,7 +219,7 @@ export default function App() {
       const p = await api('/posts', 'POST', body)
       setPosts((items) => [p, ...items])
       setCategory('All')
-      notify('Your conversation is live.')
+      notify('Post published.')
     }
     setModal(null)
   }
@@ -278,7 +288,15 @@ export default function App() {
     (item) => item.day === initialDay() && item.section === userSection,
   )
   const close = () => setModal(null)
-  if (!auth) return <Login onLogin={login} config={config} />
+  if (!auth)
+    return (
+      <Login
+        onLogin={login}
+        config={config}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+      />
+    )
   return (
     <div className="app-shell">
       <a
@@ -302,7 +320,7 @@ export default function App() {
         <Brand />
         <div className="campus-label">
           <span className="live-dot" />
-          THE STUDENT COMMONS
+          NSUT · New Delhi
         </div>
         <nav aria-label="Main navigation">
           {navigation.map(([value, icon, label]) => (
@@ -320,7 +338,7 @@ export default function App() {
           ))}
         </nav>
         <div className="nav-separator" />
-        <span className="sidebar-section-label">YOUR SPACE</span>
+        <span className="sidebar-section-label">Account</span>
         <button
           className={'nav-item ' + (page === 'profile' ? 'selected' : '')}
           onClick={() => navigate('profile')}
@@ -334,22 +352,16 @@ export default function App() {
             onClick={() => navigate('admin')}
           >
             <Icon name="shield" />
-            Admin studio
+            Admin
           </button>
         )}
         <div className="sidebar-bottom">
-          <div className="commons-note">
-            <Icon name="book" size={25} />
-            <strong>Better, together.</strong>
-            <p>
-              A place for your people,
-              <br />
-              your questions, your ideas.
-            </p>
-            <button onClick={() => setModal({ type: 'about' })}>
-              About the commons <Icon name="arrow" size={16} />
-            </button>
-          </div>
+          <button
+            className="sidebar-about"
+            onClick={() => setModal({ type: 'about' })}
+          >
+            About NSUT Connect
+          </button>
           <button className="sidebar-user" onClick={() => navigate('profile')}>
             <Avatar name={user.name} />
             <span>
@@ -383,12 +395,13 @@ export default function App() {
                 [
                   ...navigation,
                   ['profile', '', 'My profile'],
-                  ['admin', '', 'Admin studio'],
+                  ['admin', '', 'Admin'],
                 ].find((n) => n[0] === page)?.[2]
               }
             </strong>
           </div>
           <div className="topbar-actions">
+            <ThemeButton theme={theme} onToggle={toggleTheme} />
             <div className="search-box">
               <Icon name="search" size={17} />
               <input
@@ -456,7 +469,7 @@ export default function App() {
           {loading ? (
             <div className="loading-state">
               <span className="loading-spinner" />
-              <h2>Gathering your campus…</h2>
+              <h2>Loading…</h2>
             </div>
           ) : (
             <>
@@ -478,42 +491,15 @@ export default function App() {
                               })
                               .toUpperCase()}
                           </span>
-                          <h1>Hey {user.name.split(' ')[0]}, you’re home.</h1>
-                          <p>
-                            Here’s what’s happening in your corner of campus.
-                          </p>
-                        </div>
-                        <div className="welcome-banner">
-                          <div>
-                            <span className="eyebrow">
-                              YOUR CAMPUS. YOUR PEOPLE.
-                            </span>
-                            <h2>
-                              Good things start
-                              <br />
-                              with a conversation.
-                            </h2>
-                            <button
-                              onClick={() => {
-                                navigate('discussions')
-                              }}
-                            >
-                              Find your next one <Icon name="arrow" size={17} />
-                            </button>
-                          </div>
-                          <CampusDrawing />
-                          <span className="banner-edition">
-                            THE COMMONS / VOL. 01
-                          </span>
+                          <h1>Campus feed</h1>
+                          <p>Recent posts from students.</p>
                         </div>
                         <button
                           className="composer"
                           onClick={() => setModal({ type: 'post' })}
                         >
                           <Avatar name={user.name} />
-                          <span>
-                            Got a question, an idea, or a little campus news?
-                          </span>
+                          <span>Write a post or ask a question</span>
                           <span className="composer-plus">
                             <Icon name="plus" />
                           </span>
@@ -524,58 +510,24 @@ export default function App() {
                       <>
                         <div className="page-heading">
                           <div>
-                            <span className="eyebrow">
-                              ASK. SHARE. FIGURE IT OUT TOGETHER.
-                            </span>
-                            <h1>Let’s talk campus.</h1>
-                            <p>A good question can take you somewhere new.</p>
+                            <h1>Discussions</h1>
+                            <p>Questions and posts by topic.</p>
                           </div>
                           <button
                             className="button primary"
                             onClick={() => setModal({ type: 'post' })}
                           >
                             <Icon name="plus" size={17} />
-                            New conversation
+                            New post
                           </button>
-                        </div>
-                        <div className="topic-grid">
-                          {categories.slice(0, 4).map((c, i) => (
-                            <button
-                              key={c}
-                              className={
-                                'topic ' +
-                                categoryClass(c) +
-                                (category === c ? ' chosen' : '')
-                              }
-                              onClick={() =>
-                                setCategory(category === c ? 'All' : c)
-                              }
-                            >
-                              <Icon
-                                name={['book', 'calendar', 'code', 'home'][i]}
-                                size={24}
-                              />
-                              <strong>{c}</strong>
-                              <span>
-                                {posts.filter((p) => p.category === c).length}{' '}
-                                conversations
-                              </span>
-                              <Icon name="arrow" size={17} />
-                            </button>
-                          ))}
                         </div>
                       </>
                     )}
                     {page === 'saved' && (
                       <div className="page-heading">
                         <div>
-                          <span className="eyebrow">
-                            KEEP THE GOOD STUFF CLOSE
-                          </span>
-                          <h1>Worth coming back to.</h1>
-                          <p>
-                            Your bookmarked conversations, all in one place.
-                          </p>
+                          <h1>Saved posts</h1>
+                          <p>Posts you bookmarked.</p>
                         </div>
                         <span className="count-pill">
                           {
@@ -589,11 +541,8 @@ export default function App() {
                     {page === 'announcements' && (
                       <div className="page-heading">
                         <div>
-                          <span className="eyebrow">
-                            THE CAMPUS NOTICEBOARD
-                          </span>
-                          <h1>Stay in the loop.</h1>
-                          <p>Updates that deserve a place on your radar.</p>
+                          <h1>Announcements</h1>
+                          <p>Notices posted by campus administrators.</p>
                         </div>
                         {user.role === 'admin' && (
                           <button
@@ -611,10 +560,10 @@ export default function App() {
                         {query
                           ? 'Search results'
                           : page === 'announcements'
-                            ? 'Campus updates'
+                            ? 'Announcements'
                             : page === 'saved'
-                              ? 'Your collection'
-                              : 'The conversation'}
+                              ? 'Saved posts'
+                              : 'Posts'}
                       </h2>
                       {page !== 'announcements' && (
                         <label className="sort-control">
@@ -637,7 +586,7 @@ export default function App() {
                           onClick={() => setCategory(c)}
                           aria-pressed={category === c}
                         >
-                          {c === 'All' ? 'For you' : c}
+                          {c === 'All' ? 'All' : c}
                         </button>
                       ))}
                     </div>
@@ -707,7 +656,7 @@ export default function App() {
                         {!visibleAnnouncements.length && (
                           <Empty
                             icon="bell"
-                            title="Nothing on this board yet."
+                            title="No announcements found."
                             description="Try a different topic or search."
                           />
                         )}
@@ -732,13 +681,13 @@ export default function App() {
                             icon={page === 'saved' ? 'bookmark' : 'search'}
                             title={
                               page === 'saved'
-                                ? 'A place for your favourites.'
-                                : 'No conversations found.'
+                                ? 'No saved posts yet.'
+                                : 'No posts found.'
                             }
                             description={
                               page === 'saved'
-                                ? 'Tap the bookmark on any post to keep it here.'
-                                : 'Try another topic or start something new.'
+                                ? 'Use the bookmark button on a post to save it.'
+                                : 'Try another search or post a question.'
                             }
                             action={
                               <button
@@ -751,7 +700,7 @@ export default function App() {
                               >
                                 {page === 'saved'
                                   ? 'Explore the feed'
-                                  : 'Start a conversation'}
+                                  : 'New post'}
                                 <Icon name="arrow" size={16} />
                               </button>
                             }
@@ -759,16 +708,11 @@ export default function App() {
                         )}
                       </div>
                     )}
-                    <div className="feed-end">
-                      <span />
-                      YOU’RE IN GOOD COMPANY
-                      <span />
-                    </div>
                   </section>
                   <aside className="right-rail">
                     <div className="rail-heading">
                       <Icon name="pin" size={18} />
-                      <h2>On the noticeboard</h2>
+                      <h2>Latest announcements</h2>
                       <button
                         aria-label="View all announcements"
                         onClick={() => navigate('announcements')}
@@ -836,27 +780,10 @@ export default function App() {
                         <Icon name="arrow" size={17} />
                       </button>
                     </div>
-                    <div className="community-note">
-                      <span className="scribble">↗</span>
-                      <span className="eyebrow">A SMALL REMINDER</span>
-                      <h3>
-                        Someone here knows
-                        <br />
-                        what you’re figuring out.
-                      </h3>
-                      <p>
-                        Ask the question.
-                        <br />
-                        Share the notes. Say hello.
-                      </p>
-                      <button onClick={() => setModal({ type: 'post' })}>
-                        Start something <Icon name="arrow" size={16} />
-                      </button>
-                    </div>
                     <div className="rail-foot">
-                      NSUT CONNECT · CAMPUS COMMONS
+                      NSUT Connect
                       <br />
-                      Sample data · Made for connection
+                      Demo posts and notices
                     </div>
                   </aside>
                 </div>
@@ -880,14 +807,8 @@ export default function App() {
                 <>
                   <div className="page-heading">
                     <div>
-                      <span className="eyebrow">
-                        TAKE CARE OF YOUR COMMUNITY
-                      </span>
-                      <h1>The admin studio.</h1>
-                      <p>
-                        Clear updates. Thoughtful conversations. A better
-                        commons.
-                      </p>
+                      <h1>Admin</h1>
+                      <p>Manage announcements and student posts.</p>
                     </div>
                     <button
                       className="button primary"
@@ -901,7 +822,7 @@ export default function App() {
                     <div>
                       <Icon name="bell" />
                       <strong>{announcements.length}</strong>
-                      <span>Campus updates</span>
+                      <span>Announcements</span>
                     </div>
                     <div>
                       <Icon name="chat" />
@@ -957,8 +878,8 @@ export default function App() {
                   </section>
                   <section className="admin-panel">
                     <div className="feed-title-row">
-                      <h2>Moderate conversations</h2>
-                      <span className="muted">Keep the commons welcoming</span>
+                      <h2>Manage posts</h2>
+                      <span className="muted">Remove posts if needed</span>
                     </div>
                     {posts.map((p) => (
                       <div className="admin-row" key={p.id}>
@@ -991,10 +912,8 @@ export default function App() {
         </main>
         <footer className="app-footer">
           <span>NSUT Connect</span>
-          <span>Your campus, in good company.</span>
-          <button onClick={() => setModal({ type: 'about' })}>
-            About this prototype ↗
-          </button>
+          <span>Student project · Demo</span>
+          <button onClick={() => setModal({ type: 'about' })}>About</button>
         </footer>
       </div>
       {modal?.type === 'post' && (
@@ -1013,7 +932,7 @@ export default function App() {
         <Thread post={thread} user={user} onClose={close} onReply={reply} />
       )}
       {modal?.type === 'delete' && (
-        <Modal title="Remove this from the commons?" onClose={close}>
+        <Modal title="Delete this item?" onClose={close}>
           <p className="muted">
             “{modal.item.title}” will be removed. This also removes any replies
             on the post.
@@ -1030,7 +949,7 @@ export default function App() {
         </Modal>
       )}
       {modal?.type === 'notice' && (
-        <Modal title="From the noticeboard" onClose={close}>
+        <Modal title="Announcement" onClose={close}>
           <div className="notice-detail">
             <span
               className={
@@ -1052,7 +971,7 @@ export default function App() {
         </Modal>
       )}
       {modal?.type === 'notifications' && (
-        <Modal title="Your campus updates" onClose={close}>
+        <Modal title="Notifications" onClose={close}>
           <div className="notifications-intro">
             <p>
               {unread
@@ -1092,21 +1011,21 @@ export default function App() {
           {!announcements.length && (
             <Empty
               icon="bell"
-              title="A quiet moment."
+              title="No notifications"
               description="Campus announcements will appear here."
             />
           )}
         </Modal>
       )}
       {modal?.type === 'about' && (
-        <Modal title="A commons for your campus." onClose={close}>
+        <Modal title="About NSUT Connect" onClose={close}>
           <div className="about-copy">
             <Brand />
             <p>
-              NSUT Connect brings student conversations, campus announcements,
-              and your timetable into one familiar place.
+              NSUT Connect is a student project for discussions, campus notices
+              and timetables.
             </p>
-            <h3>A working campus prototype</h3>
+            <h3>Demo data</h3>
             <p>
               {isHostedDemo
                 ? 'This online version runs with sample data saved in your browser. Open it on the same device to find your changes.'
@@ -1114,10 +1033,10 @@ export default function App() {
               Timetables are transcribed from the supplied July–December 2026
               PDF. Notices and discussions are sample data.
             </p>
-            <h3>Made to feel like community</h3>
+            <h3>Features</h3>
             <p>
-              Ask questions, reply to peers, bookmark useful posts, and keep
-              your week in view. Admins can publish and manage announcements.
+              Students can post, reply, save posts and view schedules. Admins
+              can manage announcements and remove posts.
             </p>
             <p className="form-note">
               Demo accounts are for exploring roles. Google sign-in is available
