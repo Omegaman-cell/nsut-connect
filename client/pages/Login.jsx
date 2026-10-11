@@ -7,7 +7,14 @@ import { api } from '../api'
 export default function Login({ onLogin, config, theme, onToggleTheme }) {
   const [busy, setBusy] = useState('')
   const [error, setError] = useState('')
+  const [role, setRole] = useState('student')
+  const selectedRole = useRef('student')
   const google = useRef(null)
+  function chooseRole(value) {
+    selectedRole.current = value
+    setRole(value)
+    setError('')
+  }
   useEffect(() => {
     if (!config.google_client_id) return
     let active = true
@@ -25,7 +32,7 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
           setBusy('google')
           setError('')
           try {
-            onLogin(await api('/auth/google', 'POST', { credential }))
+            onLogin(await api('/auth/google', 'POST', { credential, role: selectedRole.current }))
           } catch (e) {
             setError(e.message)
           } finally {
@@ -66,11 +73,15 @@ export default function Login({ onLogin, config, theme, onToggleTheme }) {
       <section className="login-form">
         <div className="login-welcome">
           <span className="login-symbol"><Icon name="arrow" size={24} /></span>
-          <span className="eyebrow">Student account</span>
+          <span className="eyebrow">Campus account</span>
           <h2>Sign in</h2>
           <p>
             Use your @nsut.ac.in Google account.
           </p>
+          <div className="login-roles segmented" role="group" aria-label="Sign-in role">
+            <button type="button" className={role === 'student' ? 'selected' : ''} aria-pressed={role === 'student'} disabled={!!busy} onClick={() => chooseRole('student')}>Student</button>
+            <button type="button" className={role === 'admin' ? 'selected' : ''} aria-pressed={role === 'admin'} disabled={!!busy} onClick={() => chooseRole('admin')}>Admin</button>
+          </div>
           {config.google_client_id ? (
             <div ref={google} className="google-signin" />
           ) : (

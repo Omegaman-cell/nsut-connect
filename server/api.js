@@ -1,4 +1,4 @@
-import { ApiError, verifyGoogle, roleFor, randomToken, tokenHash, cookie, cookieHeader, checkOrigin } from './auth.js'
+import { ApiError, verifyGoogle, roleFor, loginRole, randomToken, tokenHash, cookie, cookieHeader, checkOrigin } from './auth.js'
 import seed from './seed.json' with { type: 'json' }
 
 const categories = ['Academics', 'Events', 'Hackathons', 'Campus', 'Opportunities']
@@ -37,13 +37,14 @@ async function seedData(db) {
 }
 async function profile(db, row, adminEmails) {
   const saved = await db.prepare('SELECT post_id FROM saved WHERE user_id = ?').bind(row.id).all()
-  const { google_sub, ...publicUser } = row
-  return { ...publicUser, role: roleFor(row.email, adminEmails), saved: saved.results.map((item) => item.post_id) }
+  const { google_sub, session_role, ...publicUser } = row
+  const role = session_role === 'admin' ? roleFor(row.email, adminEmails) : 'student'
+  return { ...publicUser, role, saved: saved.results.map((item) => item.post_id) }
 }
 async function currentUser(request, env) {
   const token = cookie(request, 'nsut_session')
   if (!/^[a-f0-9]{64}$/.test(token)) throw new ApiError(401, 'Please sign in with your campus account.')
-  const row = await env.DB.prepare('SELECT users.* FROM sessions JOIN users ON sessions.user_id = users.id WHERE sessions.token_hash = ? AND sessions.expires > ?').bind(await tokenHash(token), seconds()).first()
+  const row = await env.DB.prepare('SELECT users.*, sessions.role AS session_role FROM sessions JOIN users ON sessions.user_id = users.id WHERE sessions.token_hash = ? AND sessions.expires > ?').bind(await tokenHash(token), seconds()).first()
   if (!row) throw new ApiError(401, 'Your session has expired. Please sign in again.')
   return profile(env.DB, row, env.ADMIN_EMAILS)
 }
@@ -87,13 +88,14 @@ async function route(request, env) {
     const body = await bodyJson(request)
     const nonce = cookie(request, 'nsut_login')
     const identity = await verifyGoogle(body.credential, env.GOOGLE_CLIENT_ID, nonce)
+    const role = loginRole(identity.email, env.ADMIN_EMAILS, body.role)
     const consumed = await db.prepare('DELETE FROM login_nonces WHERE nonce = ? AND expires > ?').bind(nonce, seconds()).run()
     if (consumed.meta.changes !== 1) throw new ApiError(401, 'Reload the sign-in page and try again.')
     await db.prepare('INSERT INTO users (google_sub,email,name) VALUES (?,?,?) ON CONFLICT(google_sub) DO UPDATE SET email = excluded.email').bind(identity.sub, identity.email, identity.name).run()
     const user = await db.prepare('SELECT * FROM users WHERE google_sub = ?').bind(identity.sub).first()
     const token = randomToken()
-    await db.batch([db.prepare('DELETE FROM sessions WHERE expires < ?').bind(seconds()), db.prepare('INSERT INTO sessions (token_hash,user_id,expires) VALUES (?,?,?)').bind(await tokenHash(token), user.id, seconds() + 86400)])
-    return json({ user: await profile(db, user, env.ADMIN_EMAILS), token: 'cookie' }, 200, [cookieHeader(request, 'nsut_session', token, 86400), cookieHeader(request, 'nsut_login', '', 0)])
+    await db.batch([db.prepare('DELETE FROM sessions WHERE expires < ?').bind(seconds()), db.prepare('INSERT INTO sessions (token_hash,user_id,expires,role) VALUES (?,?,?,?)').bind(await tokenHash(token), user.id, seconds() + 86400, role)])
+    return json({ user: await profile(db, { ...user, session_role: role }, env.ADMIN_EMAILS), token: 'cookie' }, 200, [cookieHeader(request, 'nsut_session', token, 86400), cookieHeader(request, 'nsut_login', '', 0)])
   }
   if (path === '/auth/logout' && method === 'POST') {
     await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await tokenHash(cookie(request, 'nsut_session'))).run()
@@ -135,7 +137,7 @@ async function route(request, env) {
     if (action === 'save' && method === 'POST') {
       if (user.saved.includes(id)) await db.prepare('DELETE FROM saved WHERE post_id = ? AND user_id = ?').bind(id, user.id).run()
       else await db.prepare('INSERT OR IGNORE INTO saved (post_id,user_id) VALUES (?,?)').bind(id, user.id).run()
-      return json(await profile(db, await db.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first(), env.ADMIN_EMAILS))
+      return json(await profile(db, { ...(await db.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first()), session_role: user.role }, env.ADMIN_EMAILS))
     }
     if (action === 'comments' && method === 'POST') {
       const content = text((await bodyJson(request)).content, 'Reply', 1, 2000)

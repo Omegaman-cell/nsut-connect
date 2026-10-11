@@ -15,6 +15,13 @@
       "when": 1791735000000,
       "tag": "0001_midsem_answer_sheets",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791738592289,
+      "tag": "0002_session_roles",
+      "breakpoints": true
     }
   ]
 }

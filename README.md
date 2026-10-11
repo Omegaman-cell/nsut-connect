@@ -22,7 +22,7 @@ SITE_ORIGIN=http://localhost:5173
 ADMIN_EMAILS=admin@nsut.ac.in
 ```
 
-Register `http://localhost:5173` as an authorized JavaScript origin in Google Cloud. For production, register the deployed origin and set the same environment variables there. `ADMIN_EMAILS` is an optional comma-separated list of campus accounts.
+Register `http://localhost:5173` as an authorized JavaScript origin in Google Cloud. For production, register the deployed origin and set the same environment variables there. `ADMIN_EMAILS` is a comma-separated list of campus accounts allowed to choose Admin at sign-in. Choosing Student creates a student session, including for an admin account.
 
 ```sh
 pnpm test
@@ -39,3 +39,5 @@ pnpm exec wrangler d1 create nsut-connect
 ```
 
 Put the returned database ID in `wrangler.json`, then run `pnpm deploy`. Add the resulting Workers URL as an authorized JavaScript origin for the Google OAuth client.
+
+Set the production admin accounts with `pnpm exec wrangler secret put ADMIN_EMAILS`.

@@ -478,6 +478,15 @@ label input, label select, label textarea {
   min-height: 44px;
 }
 
+.login-roles {
+  width: 320px;
+  max-width: 100%;
+}
+
+.login-roles button {
+  flex: 1;
+}
+
 .login-theme {
   position: absolute;
   z-index: 5;

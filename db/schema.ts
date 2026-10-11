@@ -13,6 +13,7 @@ export const sessions = sqliteTable('sessions', {
   tokenHash: text('token_hash').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expires: integer('expires').notNull(),
+  role: text('role').notNull().default('student'),
 })
 export const loginNonces = sqliteTable('login_nonces', {
   nonce: text('nonce').primaryKey(),

@@ -37,6 +37,12 @@ export function roleFor(email, adminEmails = '') {
   return admins.includes(email.toLowerCase()) ? 'admin' : 'student'
 }
 
+export function loginRole(email, adminEmails, requestedRole = 'student') {
+  if (!['student', 'admin'].includes(requestedRole)) throw new ApiError(400, 'Choose Student or Admin.')
+  if (requestedRole === 'admin' && roleFor(email, adminEmails) !== 'admin') throw new ApiError(403, 'This account does not have admin access. Choose Student to sign in.')
+  return requestedRole
+}
+
 export function randomToken() {
   return Array.from(crypto.getRandomValues(new Uint8Array(32)), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }

@@ -9,6 +9,7 @@ import { tokenHash } from '../server/auth.js'
 const sqlite = new DatabaseSync(':memory:')
 sqlite.exec('PRAGMA foreign_keys = ON')
 sqlite.exec(readFileSync(new URL('../drizzle/0000_natural_fenris.sql', import.meta.url), 'utf8'))
+sqlite.exec(readFileSync(new URL('../drizzle/0002_session_roles.sql', import.meta.url), 'utf8'))
 function statement(sql, args = []) {
   const query = sqlite.prepare(sql)
   return {
@@ -27,8 +28,10 @@ const otherToken = 'b'.repeat(64)
 const adminToken = 'c'.repeat(64)
 for (const [id, email, token] of [[1, 'student@nsut.ac.in', studentToken], [2, 'other@nsut.ac.in', otherToken], [3, 'admin@nsut.ac.in', adminToken]]) {
   sqlite.prepare('INSERT INTO users (id,google_sub,email,name) VALUES (?,?,?,?)').run(id, 'google-' + id, email, email.split('@')[0])
-  sqlite.prepare('INSERT INTO sessions (token_hash,user_id,expires) VALUES (?,?,?)').run(await tokenHash(token), id, Math.floor(Date.now() / 1000) + 3600)
+  sqlite.prepare('INSERT INTO sessions (token_hash,user_id,expires,role) VALUES (?,?,?,?)').run(await tokenHash(token), id, Math.floor(Date.now() / 1000) + 3600, id === 3 ? 'admin' : 'student')
 }
+const adminStudentToken = 'd'.repeat(64)
+sqlite.prepare('INSERT INTO sessions (token_hash,user_id,expires,role) VALUES (?,?,?,?)').run(await tokenHash(adminStudentToken), 3, Math.floor(Date.now() / 1000) + 3600, 'student')
 async function api(path, method = 'GET', body, token = studentToken) {
   const response = await handleApi(new Request('https://campus.test/api' + path, {
     method, headers: { Origin: 'https://campus.test', 'Content-Type': 'application/json', Cookie: 'nsut_session=' + token },
@@ -60,6 +63,19 @@ test('announcement writes require a server-configured administrator', async () =
   assert.equal(created.status, 201)
   assert.equal((await api(`/announcements/${created.data.id}/pin`, 'POST', undefined, adminToken)).data.is_pinned, true)
   assert.equal((await api(`/announcements/${created.data.id}`, 'DELETE', undefined, adminToken)).status, 200)
+})
+
+test('student mode stays restricted for an admin account, and allowlist removal revokes admin access', async () => {
+  const body = { title: 'Library hours', content: 'The library closes at eight today.', category: 'Campus', is_pinned: false }
+  assert.equal((await api('/me', 'GET', undefined, adminStudentToken)).data.role, 'student')
+  assert.equal((await api('/announcements', 'POST', body, adminStudentToken)).status, 403)
+  const savedPost = (await api('/posts', 'GET', undefined, adminToken)).data[0]
+  assert.equal((await api(`/posts/${savedPost.id}/save`, 'POST', undefined, adminToken)).data.role, 'admin')
+  env.ADMIN_EMAILS = ''
+  try {
+    assert.equal((await api('/me', 'GET', undefined, adminToken)).data.role, 'student')
+    assert.equal((await api('/announcements', 'POST', body, adminToken)).status, 403)
+  } finally { env.ADMIN_EMAILS = 'admin@nsut.ac.in' }
 })
 test('profile validation and corrected timetable data work through the API', async () => {
   assert.equal((await api('/me', 'PATCH', { name: 'Classmate', bio: '', branch: 'CSE', semester: '1' })).status, 200)

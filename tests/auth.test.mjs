@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { generateKeyPair, SignJWT } from 'jose'
-import { verifyGoogle, roleFor, checkOrigin, cookieHeader } from '../server/auth.js'
+import { verifyGoogle, roleFor, loginRole, checkOrigin, cookieHeader } from '../server/auth.js'
 import { handleApi } from '../server/api.js'
 
 const { privateKey, publicKey } = await generateKeyPair('RS256')
@@ -39,12 +39,22 @@ test('roles come only from the server allowlist', () => {
   assert.equal(roleFor('student@nsut.ac.in', 'admin@nsut.ac.in'), 'student')
   assert.equal(roleFor('ADMIN@nsut.ac.in', 'admin@nsut.ac.in'), 'admin')
 })
+
+test('login choices allow student mode and restrict admin mode to configured accounts', () => {
+  const admins = 'admin@nsut.ac.in'
+  assert.equal(loginRole(admins, admins, 'student'), 'student')
+  assert.equal(loginRole(admins, admins, 'admin'), 'admin')
+  assert.equal(loginRole('student@nsut.ac.in', admins), 'student')
+  assert.throws(() => loginRole('student@nsut.ac.in', admins, 'admin'), { status: 403 })
+  assert.throws(() => loginRole(admins, '', 'admin'), { status: 403 })
+  assert.throws(() => loginRole(admins, admins, 'owner'), { status: 400 })
+})
 test('rejects cross-site writes and uses secure HttpOnly cookies on HTTPS', () => {
   const request = new Request('https://campus.test/api/posts', { method: 'POST', headers: { Origin: 'https://evil.test' } })
   assert.throws(() => checkOrigin(request), { status: 403 })
   assert.match(cookieHeader(request, 'nsut_session', 'token', 86400), /HttpOnly; SameSite=Strict; Max-Age=86400; Secure/)
 })
-test('public APIs never accept a demo account or a client-provided role', async () => {
+test('public APIs reject demo accounts and unauthenticated requests', async () => {
   const env = { DB: {}, GOOGLE_CLIENT_ID: clientId }
   const demo = await handleApi(new Request('https://campus.test/api/auth/demo', { method: 'POST', headers: { Origin: 'https://campus.test' } }), env)
   assert.equal(demo.status, 403)
