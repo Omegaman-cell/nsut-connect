@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1791733184606,
+      "tag": "0000_natural_fenris",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791735000000,
+      "tag": "0001_midsem_answer_sheets",
+      "breakpoints": true
+    }
+  ]
+}

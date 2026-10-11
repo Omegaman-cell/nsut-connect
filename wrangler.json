@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nsut-connect",
+  "main": "build/worker.ts",
+  "compatibility_date": "2026-10-11",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nsut-connect",
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "vars": {
+    "GOOGLE_CLIENT_ID": "592084949168-mhf86u26c52evahp5peokpo52kljlq6d.apps.googleusercontent.com"
+  }
+}

@@ -1,9 +1,0 @@
-node_modules/
-dist/
-.next/
-.vinext/
-.wrangler/
-.sites-runtime/
-.env*
-.dev.vars
-.openai/
